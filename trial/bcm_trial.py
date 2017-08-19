@@ -5,13 +5,15 @@ import numpy as np
 import random
 
 
-from nengo_learn_assoc_mem import learn_assoc
+from nengo_learn_assoc_mem import bcm_assoc
 
 class LearningAssocMemTrial(pytry.NengoTrial):
     def params(self):
         self.param('number of neurons', n_neurons=10)
         self.param('number of dimensions', dimensions=32)
         self.param('intercept', intercept=0.0)
+        self.param('BCM time constant', bcm_tau=0.005)
+        self.param('BCM learning rate', bcm_rate=-1e-3)
         self.param('VOja time constance', voja_tau=0.005)
         self.param('VOja learning rate', voja_rate=1e-3)
         self.param('PES learning rate', pes_rate=1e-3)
@@ -57,15 +59,15 @@ class LearningAssocMemTrial(pytry.NengoTrial):
                 return vocab.parse('%g * %s' % (scale, vocab_items[index])).v
             correct = nengo.Node(correct_func)
 
-            self.mem = learn_assoc.LearningAssocMem(
+            self.mem = bcm_assoc.BCMAssocMem(
                     n_neurons=p.n_neurons,
                     dimensions=p.dimensions,
                     intercepts=nengo.dists.Uniform(p.intercept, p.intercept),
+                    bcm_tau=p.bcm_tau,
+                    bcm_rate=p.bcm_rate,
                     voja_tau=p.voja_tau,
                     voja_rate=p.voja_rate,
                     pes_rate=p.pes_rate,
-                    inhibit_synapse=p.inhibit_synapse,
-                    inhibit_strength=p.inhibit_strength,
                     load_from = None if not p.load else p.filename,
                     seed=p.seed,
                     )

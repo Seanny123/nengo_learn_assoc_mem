@@ -1,2 +1,0 @@
-from learn_assoc import LearningAssocMem
-from spa_learn_assoc import SPALearningAssocMem
