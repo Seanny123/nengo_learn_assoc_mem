@@ -1,2 +1,3 @@
 nengo
 pytry
+numpy

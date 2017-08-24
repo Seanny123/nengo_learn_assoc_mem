@@ -1,11 +1,10 @@
 import nengo
-import nengo.spa as spa
 import numpy as np
 
 
 class LearningAssocMem(nengo.Network):
     def __init__(self, n_neurons, dimensions,
-                 intercepts=nengo.dists.Uniform(0,0),
+                 intercepts=nengo.dists.Uniform(0, 0),
                  voja_tau=0.005,
                  voja_rate=1e-3,
                  pes_rate=1e-3,
@@ -35,7 +34,7 @@ class LearningAssocMem(nengo.Network):
             self.mem = nengo.Ensemble(n_neurons=n_neurons,
                                       dimensions=dimensions,
                                       intercepts=intercepts,
-                                      #max_rates=nengo.dists.Uniform(150,150),
+                                      # max_rates=nengo.dists.Uniform(150,150),
                                       encoders=encoders,
                                       seed=seed,
                                       )
@@ -49,8 +48,7 @@ class LearningAssocMem(nengo.Network):
             else:
                 learning_rule_type = None
             self.conn_in = nengo.Connection(self.input, self.mem,
-                             learning_rule_type=learning_rule_type)
-
+                                            learning_rule_type=learning_rule_type)
 
             if pes_rate > 0:
                 learning_rule_type = nengo.PES(learning_rate=pes_rate)
@@ -58,14 +56,14 @@ class LearningAssocMem(nengo.Network):
                 learning_rule_type = None
 
             self.conn_out = nengo.Connection(self.mem.neurons, self.output,
-                transform=decoders,
-                learning_rule_type=learning_rule_type,
-                )
+                                             transform=decoders,
+                                             learning_rule_type=learning_rule_type,
+                                             )
 
             if pes_rate > 0:
                 self.learn_control = nengo.Node(
-                    lambda t, x: x[:-1] if x[-1] < 0.5 else x[:-1]*0,
-                    size_in=dimensions+1)
+                    lambda t, x: x[:-1] if x[-1] < 0.5 else x[:-1] * 0,
+                    size_in=dimensions + 1)
                 nengo.Connection(self.learn_control,
                                  self.conn_out.learning_rule,
                                  )
@@ -77,21 +75,19 @@ class LearningAssocMem(nengo.Network):
                 nengo.Connection(self.stop_pes, self.learn_control[-1],
                                  synapse=None)
 
-
             if inhibit_all:
                 inhibit = nengo.Node(None, size_in=1)
                 nengo.Connection(self.mem.neurons, inhibit,
-                    transform=inhibit_strength*np.ones((1, n_neurons)),
-                    synapse=None)
+                                 transform=inhibit_strength * np.ones((1, n_neurons)),
+                                 synapse=None)
                 nengo.Connection(inhibit, self.mem.neurons,
-                        transform=-np.ones((self.mem.n_neurons, 1)),
-                        synapse=inhibit_synapse)
+                                 transform=-np.ones((self.mem.n_neurons, 1)),
+                                 synapse=inhibit_synapse)
 
             else:
                 nengo.Connection(self.mem.neurons, self.mem.neurons,
-                    transform=inhibit_strength*(np.eye(self.mem.n_neurons)-1),
-                    synapse=inhibit_synapse)
-
+                                 transform=inhibit_strength * (np.eye(self.mem.n_neurons) - 1),
+                                 synapse=inhibit_synapse)
 
     def create_weight_probes(self):
         with self:
@@ -104,4 +100,3 @@ class LearningAssocMem(nengo.Network):
         enc = sim.data[self.probe_encoder][-1]
         dec = sim.data[self.probe_decoder][-1]
         np.savez(filename, enc=enc, dec=dec, seed=self.seed)
-

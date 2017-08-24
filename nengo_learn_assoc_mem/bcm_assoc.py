@@ -2,7 +2,7 @@ import nengo
 import nengo.spa as spa
 import numpy as np
 
-from nengo_learn_assoc_mem.pos_bcm import PosBCM
+from nengo_learn_assoc_mem.neg_bcm import NegBCM
 
 
 class BCMAssocMem(nengo.Network):
@@ -53,7 +53,7 @@ class BCMAssocMem(nengo.Network):
                                             learning_rule_type=learning_rule_type)
 
             if bcm_rate != 0:
-                learning_rule_type = PosBCM(post_tau=bcm_tau,
+                learning_rule_type = NegBCM(post_tau=bcm_tau,
                                             learning_rate=bcm_rate)
             else:
                 learning_rule_type = None
@@ -92,8 +92,11 @@ class BCMAssocMem(nengo.Network):
                                              sample_every=0.1)
             self.probe_decoder = nengo.Probe(self.conn_out, 'weights',
                                              sample_every=0.1)
+            self.probe_rec = nengo.Probe(self.conn_rec, 'weights',
+                                         sample_every=0.1)
 
     def save(self, filename, sim):
         enc = sim.data[self.probe_encoder][-1]
         dec = sim.data[self.probe_decoder][-1]
-        np.savez(filename, enc=enc, dec=dec, seed=self.seed)
+        rec = sim.data[self.probe_rec][-1]
+        np.savez(filename, enc=enc, dec=dec, rec=rec, seed=self.seed)

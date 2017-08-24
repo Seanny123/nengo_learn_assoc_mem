@@ -7,6 +7,7 @@ import random
 
 from nengo_learn_assoc_mem import learn_assoc
 
+
 class LearningAssocMemTrial(pytry.NengoTrial):
     def params(self):
         self.param('number of neurons', n_neurons=10)
@@ -21,7 +22,7 @@ class LearningAssocMemTrial(pytry.NengoTrial):
         self.param('number of items', n_items=6)
         self.param('number of presentations per item', n_present=4)
         self.param('lower scale on input values', input_scale=1.0)
-        self.param('filename for saving/loading', filename='weights.npz')
+        self.param('filename for saving/loading', weight_filename='weights.npz')
         self.param('load weights at beginning', load=False)
         self.param('save weights at end', save=False)
         self.param('input similarity', input_similarity=0.0)
@@ -66,7 +67,7 @@ class LearningAssocMemTrial(pytry.NengoTrial):
                     pes_rate=p.pes_rate,
                     inhibit_synapse=p.inhibit_synapse,
                     inhibit_strength=p.inhibit_strength,
-                    load_from = None if not p.load else p.filename,
+                    load_from = None if not p.load else p.weight_filename,
                     seed=p.seed,
                     )
             if p.save:
@@ -91,7 +92,7 @@ class LearningAssocMemTrial(pytry.NengoTrial):
     def evaluate(self, p, sim, plt):
         sim.run(p.n_present*p.n_items*p.t_present)
         if p.save:
-            self.mem.save(p.filename, sim)
+            self.mem.save(p.weight_filename, sim)
 
         data = sim.data[self.p_output]
         ideal = sim.data[self.p_ideal]
@@ -100,7 +101,7 @@ class LearningAssocMemTrial(pytry.NengoTrial):
         times = np.arange(p.n_items*p.n_present)*p.t_present
         indices = (times / p.dt).astype(int) - 1
 
-        scores = [[] for i in range(p.n_items)]
+        scores = [[] for _ in range(p.n_items)]
 
         for i, index in enumerate(indices):
             a = accuracy[index]
@@ -114,5 +115,5 @@ class LearningAssocMemTrial(pytry.NengoTrial):
             plt.plot(np.mean(scores, axis=0))
 
         return dict(
-            score = np.mean(scores, axis=0),
+            score=np.mean(scores, axis=0),
             )
