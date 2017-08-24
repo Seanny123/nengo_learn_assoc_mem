@@ -2,10 +2,12 @@ import nengo
 import nengo.spa as spa
 import numpy as np
 
+from nengo_learn_assoc_mem.pos_bcm import PosBCM
+
 
 class BCMAssocMem(nengo.Network):
     def __init__(self, n_neurons, dimensions,
-                 intercepts=nengo.dists.Uniform(0,0),
+                 intercepts=nengo.dists.Uniform(0, 0),
                  bcm_tau=0.005,
                  bcm_rate=-1e-3,
                  voja_tau=0.005,
@@ -13,8 +15,7 @@ class BCMAssocMem(nengo.Network):
                  pes_rate=1e-3,
                  label=None,
                  seed=None,
-                 load_from=None,
-                 inhibit_all=False,
+                 load_from=None
                  ):
         super(BCMAssocMem, self).__init__(label=label)
         if load_from is not None:
@@ -35,7 +36,7 @@ class BCMAssocMem(nengo.Network):
             self.mem = nengo.Ensemble(n_neurons=n_neurons,
                                       dimensions=dimensions,
                                       intercepts=intercepts,
-                                      #max_rates=nengo.dists.Uniform(150,150),
+                                      # max_rates=nengo.dists.Uniform(150,150),
                                       encoders=encoders,
                                       seed=seed,
                                       )
@@ -49,17 +50,16 @@ class BCMAssocMem(nengo.Network):
             else:
                 learning_rule_type = None
             self.conn_in = nengo.Connection(self.input, self.mem,
-                             learning_rule_type=learning_rule_type)
+                                            learning_rule_type=learning_rule_type)
 
-            if bcm_rate > 0:
-                learning_rule_type = nengo.BCM(post_tau=bcm_tau,
-                                                learning_rate=voja_rate)
+            if bcm_rate != 0:
+                learning_rule_type = PosBCM(post_tau=bcm_tau,
+                                            learning_rate=bcm_rate)
             else:
                 learning_rule_type = None
             self.conn_rec = nengo.Connection(self.mem.neurons, self.mem.neurons,
-                             transform=np.zeros((n_neurons, n_neurons), dtype=float),
-                             learning_rule_type=learning_rule_type)
-
+                                             transform=np.zeros((n_neurons, n_neurons), dtype=float),
+                                             learning_rule_type=learning_rule_type)
 
             if pes_rate > 0:
                 learning_rule_type = nengo.PES(learning_rate=pes_rate)
@@ -67,14 +67,14 @@ class BCMAssocMem(nengo.Network):
                 learning_rule_type = None
 
             self.conn_out = nengo.Connection(self.mem.neurons, self.output,
-                transform=decoders,
-                learning_rule_type=learning_rule_type,
-                )
+                                             transform=decoders,
+                                             learning_rule_type=learning_rule_type,
+                                             )
 
             if pes_rate > 0:
                 self.learn_control = nengo.Node(
-                    lambda t, x: x[:-1] if x[-1] < 0.5 else x[:-1]*0,
-                    size_in=dimensions+1)
+                    lambda t, x: x[:-1] if x[-1] < 0.5 else x[:-1] * 0,
+                    size_in=dimensions + 1)
                 nengo.Connection(self.learn_control,
                                  self.conn_out.learning_rule,
                                  )
@@ -85,7 +85,6 @@ class BCMAssocMem(nengo.Network):
                 self.stop_pes = nengo.Node(None, size_in=1)
                 nengo.Connection(self.stop_pes, self.learn_control[-1],
                                  synapse=None)
-
 
     def create_weight_probes(self):
         with self:
