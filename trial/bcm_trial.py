@@ -27,6 +27,7 @@ class LearningAssocMemTrial(pytry.NengoTrial):
         self.param('filename for saving/loading', weight_filename='weights.npz')
         self.param('load weights at beginning', load=False)
         self.param('save weights at end', save=False)
+        self.param('save all weights at end', save_all_weights=False)
         self.param('input similarity', input_similarity=0.0)
 
     def model(self, p):
@@ -96,6 +97,9 @@ class LearningAssocMemTrial(pytry.NengoTrial):
         sim.run(p.n_present*p.n_items*p.t_present)
         if p.save:
             self.mem.save(p.weight_filename, sim)
+
+        if p.save_all_weights:
+            self.mem.save_all_weights(p.weight_filename, sim)
 
         data = sim.data[self.p_output]
         ideal = sim.data[self.p_ideal]

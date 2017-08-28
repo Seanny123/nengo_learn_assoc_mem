@@ -100,3 +100,8 @@ class LearningAssocMem(nengo.Network):
         enc = sim.data[self.probe_encoder][-1]
         dec = sim.data[self.probe_decoder][-1]
         np.savez(filename, enc=enc, dec=dec, seed=self.seed)
+
+    def save_all_weights(self, filename, sim):
+        enc = sim.data[self.probe_encoder]
+        dec = sim.data[self.probe_decoder]
+        np.savez(filename, enc=enc, dec=dec)

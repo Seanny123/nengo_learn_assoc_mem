@@ -1,5 +1,4 @@
 import nengo
-import nengo.spa as spa
 import numpy as np
 
 from nengo_learn_assoc_mem.neg_bcm import NegBCM
@@ -100,3 +99,9 @@ class BCMAssocMem(nengo.Network):
         dec = sim.data[self.probe_decoder][-1]
         rec = sim.data[self.probe_rec][-1]
         np.savez(filename, enc=enc, dec=dec, rec=rec, seed=self.seed)
+
+    def save_all_weights(self, filename, sim):
+        enc = sim.data[self.probe_encoder]
+        dec = sim.data[self.probe_decoder]
+        rec = sim.data[self.probe_rec]
+        np.savez(filename, enc=enc, dec=dec, rec=rec)
