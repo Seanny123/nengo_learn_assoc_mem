@@ -74,7 +74,7 @@ class LearningAssocMemTrial(pytry.NengoTrial):
                     load_from = None if not p.load else p.weight_filename,
                     seed=p.seed,
                     )
-            if p.save:
+            if p.save or p.save_all_weights:
                 self.mem.create_weight_probes()
             nengo.Connection(stim, self.mem.input, synapse=None)
             nengo.Connection(correct, self.mem.correct, synapse=None)
