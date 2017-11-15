@@ -5,10 +5,19 @@ import numpy as np
 import random
 
 
-from nengo_learn_assoc_mem import bcm_assoc
+from nengo_learn_assoc_mem import bcm_assoc, utils
 
 
 class LearningAssocMemTrial(pytry.NengoTrial):
+
+    def __init__(self):
+        super().__init__()
+        self.items = []
+        self.mem = None
+        self.p_ideal = None
+        self.p_output = None
+        self.locals = None
+
     def params(self):
         self.param('number of neurons', n_neurons=10)
         self.param('number of dimensions', dimensions=32)
@@ -62,6 +71,7 @@ class LearningAssocMemTrial(pytry.NengoTrial):
                 return vocab.parse('%g * %s' % (scale, vocab_items[index])).v
             correct = nengo.Node(correct_func)
 
+            load_from = None if not p.load else p.weight_filename
             self.mem = bcm_assoc.BCMAssocMem(
                     n_neurons=p.n_neurons,
                     dimensions=p.dimensions,
@@ -71,7 +81,7 @@ class LearningAssocMemTrial(pytry.NengoTrial):
                     voja_tau=p.voja_tau,
                     voja_rate=p.voja_rate,
                     pes_rate=p.pes_rate,
-                    load_from = None if not p.load else p.weight_filename,
+                    load_from =load_from,
                     seed=p.seed,
                     )
             if p.save or p.save_all_weights:
@@ -105,7 +115,7 @@ class LearningAssocMemTrial(pytry.NengoTrial):
         ideal = sim.data[self.p_ideal]
         accuracy = np.sum(data * ideal, axis=1)
 
-        times = np.arange(p.n_items*p.n_present)*p.t_present
+        times = np.arange(p.n_items*p.n_present) * p.t_present
         indices = (times / p.dt).astype(int) - 1
 
         scores = [[] for _ in range(p.n_items)]
@@ -122,5 +132,4 @@ class LearningAssocMemTrial(pytry.NengoTrial):
             plt.plot(np.mean(scores, axis=0))
 
         return dict(
-            score=np.mean(scores, axis=0),
-            )
+            score=np.mean(scores, axis=0))
