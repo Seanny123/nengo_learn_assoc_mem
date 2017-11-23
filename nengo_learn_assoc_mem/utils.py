@@ -71,4 +71,3 @@ class BasicVecFeed(object):
             self.paused = True
 
         return np.zeros(self.dims)
-
