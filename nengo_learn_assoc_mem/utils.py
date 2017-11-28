@@ -1,3 +1,5 @@
+import nengo
+from nengo import spa
 import numpy as np
 
 from random import shuffle
@@ -5,6 +7,35 @@ from random import shuffle
 from typing import Sequence
 
 dt = 0.001
+
+
+def make_fan_vocab(seed, dimensions: int):
+    rng = np.random.RandomState(seed=seed)
+    vocab = spa.Vocabulary(dimensions, rng=rng)
+
+    fan1 = ["CAT+DOG", "DUCK+FISH", "HORSE+COW"]
+    fan1_vecs = []
+    fan1_labels = ["F11", "F12", "F13"]
+
+    fan2 = ["PIG+RAT", "PIG+GOAT", "SHEEP+EMU", "SHEEP+GOOSE"]
+    fan2_vecs = []
+    fan2_labels = ["F21", "F22", "F23", "F24"]
+
+    for vec in fan1:
+        sum_vec = vocab.parse(vec).v
+        norm_vec = sum_vec / np.linalg.norm(sum_vec)
+        fan1_vecs.append(norm_vec)
+
+    for vec in fan2:
+        sum_vec = vocab.parse(vec).v
+        norm_vec = sum_vec / np.linalg.norm(sum_vec)
+        fan2_vecs.append(norm_vec)
+
+    return vocab, fan1, fan1_vecs, fan1_labels, fan2, fan2_vecs, fan2_labels
+
+
+def meg_from_spikes(spikes: np.ndarray, meg_syn=0.1):
+    return nengo.Lowpass(meg_syn).filt(np.sum(spikes, axis=1))
 
 
 def gen_feed_func(vocab, vocab_items, t_present: float):
