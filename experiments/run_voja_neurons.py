@@ -1,7 +1,7 @@
 """make a plot showing how the response changes as a function of the voja rate and number of neurons"""
 
 import numpy as np
-import pandas as pd
+import h5py
 
 import nengo
 
@@ -38,6 +38,8 @@ def is_ans(t, x):
 
 
 def train_net(neuron_num: int, vr: float, net_seed):
+    pres_num = 20
+
     data_feed = BasicVecFeed(all_vecs, all_vecs, t_present, dimensions, len(all_vecs), t_pause)
 
     with nengo.Network(seed=net_seed) as train_model:
@@ -60,7 +62,7 @@ def train_net(neuron_num: int, vr: float, net_seed):
         train_model.p_dec = nengo.Probe(mem.conn_out, 'weights', sample_every=0.1)
 
     with nengo.Simulator(train_model) as sim:
-        sim.run(len(all_labels) * (t_present + t_pause) * 20 + t_pause)
+        sim.run(len(all_labels) * (t_present + t_pause) * pres_num + t_pause)
 
     load_from = dict()
     load_from["enc"] = sim.data[train_model.p_enc][-1].copy()
@@ -119,49 +121,50 @@ def run_feed(neuron_num: int, vr: float, net_seed):
 
         foil_resp.append(meg_from_spikes(
             np.concatenate(
-                (np.zeros((100, neuron_num)), sim.data[p_spikes]), axis=0))
+                (np.zeros((100, neuron_num)), sim.data[p_spikes]), axis=0))[100:]
         )
 
     foil_resp = np.array(foil_resp).T
 
-    return fan1_resp, fan2_resp, foil_resp
+    return {"fan1": fan1_resp, "fan2": fan2_resp, "foil": foil_resp}
 
 
 df_cols = ("t_idx", "value", "metric", "n_neurons", "learning_rate", "seed")
-resp_df = pd.DataFrame(columns=df_cols)
-mean_df = pd.DataFrame(columns=df_cols)
 
 # Show effect of different number of neurons
 n_neurons = (10, 30, 50)
+voja_rate = 1e-4
 
-resp_res = []
-mean_res = []
+with h5py.File("data/num_neurons.h5", "w") as fi:
 
-for sd in range(10):
     for nrn in n_neurons:
-        res = run_feed(nrn, 1e-4, sd)
+        n_grp = fi.create_group(str(nrn))
 
-        t_len = res[0].shape[0]
-        resp_res.append((
-            np.arange(t_len),
-            res[0],
-            ["fan1",]*t_len,
-            np.ones(t_len)*nrn,
-            np.ones(t_len)*1e-4,
-            np.ones(t_len)*sd))
+        for sd in range(10):
+            sd_grp = n_grp.create_group(str(sd))
+            sd_grp["n_neurons"] = nrn
+            sd_grp["learning_rate"] = voja_rate
+            sd_grp["seed"] = sd
+            res = run_feed(nrn, voja_rate, sd)
+
+            for key, val in res.items():
+                sd_grp.create_dataset(key, data=val)
 
 
 # Show effect of different learning rate
 voja_rates = (1e-3, 1e-4, 1e-5)
+nrn = 10
 
-for sd in range(10):
+with h5py.File("data/voja_rate.h5", "w") as fi:
     for voja_rate in voja_rates:
-        res = run_feed(10, voja_rate, sd)
+        v_grp = fi.create_group(str(voja_rate))
 
-        vr_fan1_resp[vr].append(res[0])
-        vr_fan2_resp[vr].append(res[1])
-        vr_foil_resp[vr].append(res[2])
+        for sd in range(10):
+            sd_grp = v_grp.create_group(str(sd))
+            sd_grp["n_neurons"] = nrn
+            sd_grp["learning_rate"] = voja_rate
+            sd_grp["seed"] = sd
+            res = run_feed(nrn, voja_rate, sd)
 
-        vr_fan1_mean[vr].append(np.mean(res[0], axis=0))
-        vr_fan2_mean[vr].append(np.mean(res[1], axis=0))
-        vr_foil_mean[vr].append(np.mean(res[2], axis=0))
+            for key, val in res.items():
+                sd_grp.create_dataset(key, data=val)
