@@ -152,12 +152,12 @@ with h5py.File("data/num_neurons.h5", "w") as fi:
 
 
 # Show effect of different learning rate
-voja_rates = (1e-3, 1e-4, 1e-5)
+voja_rates = {"1e-3": 1e-3, "1e-4": 1e-4, "1e-5": 1e-5}
 nrn = 10
 
 with h5py.File("data/voja_rate.h5", "w") as fi:
-    for voja_rate in voja_rates:
-        v_grp = fi.create_group(str(voja_rate))
+    for desc, voja_rate in voja_rates.items():
+        v_grp = fi.create_group(desc)
 
         for sd in range(10):
             sd_grp = v_grp.create_group(str(sd))
