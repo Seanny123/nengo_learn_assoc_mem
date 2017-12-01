@@ -126,36 +126,14 @@ def run_feed(neuron_num: int, vr: float, net_seed):
 
     foil_resp = np.array(foil_resp).T
 
-    return {"fan1": fan1_resp, "fan2": fan2_resp, "foil": foil_resp[100:]}
-
-
-df_cols = ("t_idx", "value", "metric", "n_neurons", "learning_rate", "seed")
-
-# Show effect of different number of neurons
-n_neurons = (10, 30, 50)
-voja_rate = 1e-4
-
-with h5py.File("data/num_neurons.h5", "w") as fi:
-
-    for nrn in n_neurons:
-        n_grp = fi.create_group(str(nrn))
-
-        for sd in range(10):
-            sd_grp = n_grp.create_group(str(sd))
-            sd_grp.attrs["n_neurons"] = nrn
-            sd_grp.attrs["learning_rate"] = voja_rate
-            sd_grp.attrs["seed"] = sd
-            res = run_feed(nrn, voja_rate, sd)
-
-            for key, val in res.items():
-                sd_grp.create_dataset(key, data=val)
+    return {"fan1": fan1_resp, "fan2": fan2_resp, "foil": foil_resp}
 
 
 # Show effect of different learning rate
-voja_rates = {"1e-3": 1e-3, "1e-4": 1e-4, "1e-5": 1e-5}
-nrn = 10
+voja_rates = {"5e-4": 5e-4, "7e-4": 7.5e-4, "1e-5": 1e-5, "2.5e-5": 2.5e-5, "5e-5": 5e-5}
+nrn = 100
 
-with h5py.File("data/voja_rate.h5", "w") as fi:
+with h5py.File("data/basic_match.h5", "w") as fi:
     for desc, voja_rate in voja_rates.items():
         v_grp = fi.create_group(desc)
 
