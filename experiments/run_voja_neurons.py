@@ -126,7 +126,7 @@ def run_feed(neuron_num: int, vr: float, net_seed):
 
     foil_resp = np.array(foil_resp).T
 
-    return {"fan1": fan1_resp, "fan2": fan2_resp, "foil": foil_resp}
+    return {"fan1": fan1_resp, "fan2": fan2_resp, "foil": foil_resp[100:]}
 
 
 df_cols = ("t_idx", "value", "metric", "n_neurons", "learning_rate", "seed")
@@ -142,9 +142,9 @@ with h5py.File("data/num_neurons.h5", "w") as fi:
 
         for sd in range(10):
             sd_grp = n_grp.create_group(str(sd))
-            sd_grp["n_neurons"] = nrn
-            sd_grp["learning_rate"] = voja_rate
-            sd_grp["seed"] = sd
+            sd_grp.attrs["n_neurons"] = nrn
+            sd_grp.attrs["learning_rate"] = voja_rate
+            sd_grp.attrs["seed"] = sd
             res = run_feed(nrn, voja_rate, sd)
 
             for key, val in res.items():
@@ -161,9 +161,9 @@ with h5py.File("data/voja_rate.h5", "w") as fi:
 
         for sd in range(10):
             sd_grp = v_grp.create_group(str(sd))
-            sd_grp["n_neurons"] = nrn
-            sd_grp["learning_rate"] = voja_rate
-            sd_grp["seed"] = sd
+            sd_grp.attrs["n_neurons"] = nrn
+            sd_grp.attrs["learning_rate"] = voja_rate
+            sd_grp.attrs["seed"] = sd
             res = run_feed(nrn, voja_rate, sd)
 
             for key, val in res.items():
