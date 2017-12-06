@@ -4,9 +4,24 @@ import numpy as np
 
 from random import shuffle
 
-from typing import Sequence
+from typing import Sequence, List
 
 dt = 0.001
+
+
+def spa_parse_norm(vocab: spa.Vocabulary, spa_str: str):
+    big_vec = vocab.parse(spa_str).v
+    return big_vec / np.linalg.norm(big_vec)
+
+
+def norm_spa_vecs(vocab: spa.Vocabulary, spa_strs: List[str]):
+    res = []
+
+    for spa_str in spa_strs:
+        norm_vec = spa_parse_norm(vocab, spa_str)
+        res.append(norm_vec)
+
+    return res
 
 
 def make_fan_vocab(seed, dimensions: int):
@@ -14,22 +29,12 @@ def make_fan_vocab(seed, dimensions: int):
     vocab = spa.Vocabulary(dimensions, rng=rng)
 
     fan1 = ["CAT+DOG", "DUCK+FISH", "HORSE+COW"]
-    fan1_vecs = []
+    fan1_vecs = norm_spa_vecs(vocab, fan1)
     fan1_labels = ["F11", "F12", "F13"]
 
     fan2 = ["PIG+RAT", "PIG+GOAT", "SHEEP+EMU", "SHEEP+GOOSE"]
-    fan2_vecs = []
+    fan2_vecs = norm_spa_vecs(vocab, fan2)
     fan2_labels = ["F21", "F22", "F23", "F24"]
-
-    for vec in fan1:
-        sum_vec = vocab.parse(vec).v
-        norm_vec = sum_vec / np.linalg.norm(sum_vec)
-        fan1_vecs.append(norm_vec)
-
-    for vec in fan2:
-        sum_vec = vocab.parse(vec).v
-        norm_vec = sum_vec / np.linalg.norm(sum_vec)
-        fan2_vecs.append(norm_vec)
 
     return vocab, fan1, fan1_vecs, fan1_labels, fan2, fan2_vecs, fan2_labels
 

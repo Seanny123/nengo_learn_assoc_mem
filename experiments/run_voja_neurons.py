@@ -5,8 +5,10 @@ import h5py
 
 import nengo
 
-from nengo_learn_assoc_mem.utils import BasicVecFeed, meg_from_spikes, make_fan_vocab
+from nengo_learn_assoc_mem.utils import BasicVecFeed, meg_from_spikes, make_fan_vocab, spa_parse_norm
 from nengo_learn_assoc_mem.learn_assoc import LearningAssocMem
+
+from typing import List
 
 
 t_present = 0.3
@@ -35,6 +37,25 @@ def is_ans(t, x):
         return 1
     else:
         return -1
+
+
+def get_foil_resp(stim, correct, model, foil_stim: List[str], neuron_num: int, spikes: np.ndarray):
+    foil_resp = []
+
+    for foil in foil_stim:
+        f_vec = spa_parse_norm(vocab, foil)
+        stim.output = lambda t: f_vec
+        correct.output = lambda t: f_vec
+
+        with nengo.Simulator(model) as sim:
+            sim.run(t_present)
+
+        foil_resp.append(meg_from_spikes(
+            np.concatenate(
+                (np.zeros((100, neuron_num)), spikes), axis=0))[100:]
+                          )
+
+    return np.array(foil_resp).T
 
 
 def train_net(neuron_num: int, vr: float, net_seed):
@@ -109,32 +130,24 @@ def run_feed(neuron_num: int, vr: float, net_seed):
 
     fan2_resp = np.array(fan2_resp).T
 
-    foil_resp = []
+    foil1_stim = ["FROG+CAT", "TOAD+DOG", "NEWT+DUCK", "ROACH+FISH"]
+    foil1_resp = get_foil_resp(stim, correct, model, foil1_stim, neuron_num, sim.data[p_spikes])
 
-    for foil in ("FROG", "TOAD", "NEWT", "ROACH"):
-        f_vec = vocab.parse(foil).v
-        stim.output = lambda t: f_vec
-        correct.output = lambda t: f_vec
+    foil2_stim = ["FROG+TOAD", "TOAD+NEWT", "NEWT+ROACH", "ROACH+FROG"]
+    foil2_resp = get_foil_resp(stim, correct, model, foil2_stim, neuron_num, sim.data[p_spikes])
 
-        with nengo.Simulator(model) as sim:
-            sim.run(t_present)
-
-        foil_resp.append(meg_from_spikes(
-            np.concatenate(
-                (np.zeros((100, neuron_num)), sim.data[p_spikes]), axis=0))[100:]
-        )
-
-    foil_resp = np.array(foil_resp).T
-
-    return {"fan1": fan1_resp, "fan2": fan2_resp, "foil": foil_resp}
+    return {"fan1": fan1_resp, "fan2": fan2_resp, "foil1": foil1_resp, "foil2": foil2_resp}
 
 
 # Show effect of different learning rate
-voja_rates = {"5e-4": 5e-4, "7e-4": 7.5e-4, "1e-5": 1e-5, "2.5e-5": 2.5e-5, "5e-5": 5e-5}
-nrn = 100
+voja_rates = ("1e-4", "5e-4", "1e-5")
+vr_dict = {}
+for voja_r in voja_rates:
+    vr_dict[voja_r] = float(voja_r)
+nrn = 50
 
-with h5py.File("data/basic_match.h5", "w") as fi:
-    for desc, voja_rate in voja_rates.items():
+with h5py.File("data/fixed_foil.h5", "w") as fi:
+    for desc, voja_rate in vr_dict.items():
         v_grp = fi.create_group(desc)
 
         for sd in range(10):
