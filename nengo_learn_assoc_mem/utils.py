@@ -30,11 +30,11 @@ def make_fan_vocab(seed, dimensions: int):
 
     fan1 = ["CAT+DOG", "DUCK+FISH", "HORSE+COW"]
     fan1_vecs = norm_spa_vecs(vocab, fan1)
-    fan1_labels = ["F11", "F12", "F13"]
+    fan1_labels = ["F1%s" % i for i in range(len(fan1))]
 
-    fan2 = ["PIG+RAT", "PIG+GOAT", "SHEEP+EMU", "SHEEP+GOOSE"]
+    fan2 = ["PIG+RAT", "PIG+GOAT", "SHEEP+EMU", "SHEEP+GOOSE", "FROG+TOAD", "FROG+NEWT"]
     fan2_vecs = norm_spa_vecs(vocab, fan2)
-    fan2_labels = ["F21", "F22", "F23", "F24"]
+    fan2_labels = ["F2%s" % i for i in range(len(fan1))]
 
     return vocab, fan1, fan1_vecs, fan1_labels, fan2, fan2_vecs, fan2_labels
 

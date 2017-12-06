@@ -39,7 +39,7 @@ def is_ans(t, x):
         return -1
 
 
-def get_foil_resp(stim, correct, model, foil_stim: List[str], neuron_num: int, spikes: np.ndarray):
+def get_foil_resp(stim, correct, model, foil_stim: List[str], neuron_num: int, p_spikes: nengo.Probe):
     foil_resp = []
 
     for foil in foil_stim:
@@ -52,7 +52,7 @@ def get_foil_resp(stim, correct, model, foil_stim: List[str], neuron_num: int, s
 
         foil_resp.append(meg_from_spikes(
             np.concatenate(
-                (np.zeros((100, neuron_num)), spikes), axis=0))[100:]
+                (np.zeros((100, neuron_num)), sim.data[p_spikes]), axis=0))[100:]
                           )
 
     return np.array(foil_resp).T
@@ -130,11 +130,11 @@ def run_feed(neuron_num: int, vr: float, net_seed):
 
     fan2_resp = np.array(fan2_resp).T
 
-    foil1_stim = ["FROG+CAT", "TOAD+DOG", "NEWT+DUCK", "ROACH+FISH"]
-    foil1_resp = get_foil_resp(stim, correct, model, foil1_stim, neuron_num, sim.data[p_spikes])
+    foil1_stim = ["CAT+FISH", "CAT+DUCK", "DOG+FISH", "DOG+DUCK"]
+    foil1_resp = get_foil_resp(stim, correct, model, foil1_stim, neuron_num, p_spikes)
 
-    foil2_stim = ["FROG+TOAD", "TOAD+NEWT", "NEWT+ROACH", "ROACH+FROG"]
-    foil2_resp = get_foil_resp(stim, correct, model, foil2_stim, neuron_num, sim.data[p_spikes])
+    foil2_stim = ["PIG+SHEEP", "PIG+FROG", "SHEEP+FROG"]
+    foil2_resp = get_foil_resp(stim, correct, model, foil2_stim, neuron_num, p_spikes)
 
     return {"fan1": fan1_resp, "fan2": fan2_resp, "foil1": foil1_resp, "foil2": foil2_resp}
 
