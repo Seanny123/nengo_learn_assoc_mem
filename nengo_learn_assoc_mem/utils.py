@@ -1,12 +1,57 @@
 import nengo
-from nengo import spa
+import nengo_spa as spa
 import numpy as np
 
 from random import shuffle
 
-from typing import Sequence, List
+from typing import Sequence, List, Tuple
 
 dt = 0.001
+
+
+def vecs_from_list(vocab: spa.Vocabulary, spa_strs: List[Tuple[str, str]], norm=False) -> List[np.ndarray]:
+    res = []
+    for i1, i2 in spa_strs:
+        vec_str = f"{i1}+{i2}"
+
+        if norm:
+            res.append(spa_parse_norm(vocab, vec_str))
+        else:
+            res.append(vocab.parse(vec_str).v)
+
+    return res
+
+
+def make_alt_vocab(n_items: int, dimensions: int, seed, norm=False):
+    rng = np.random.RandomState(seed=seed)
+
+    fan1 = []
+    foil1 = []
+    for i in range(int(n_items / 5)):
+        fan1.append(('F1_%d' % (2 * i), 'F1_%d' % (2 * i + 1)))
+        foil1.append(('F1_%d' % (2 * i), 'F1_%d' % (2 * i + 1)))
+
+    fan2 = []
+    for i in range(int(n_items / 5)):
+        fan2.append(('F2_%d' % (4 * i), 'F2_%d' % (4 * i + 1)))
+        fan2.append(('F2_%d' % (4 * i), 'F2_%d' % (4 * i + 2)))
+        fan2.append(('F2_%d' % (4 * i + 3), 'F2_%d' % (4 * i + 1)))
+        fan2.append(('F2_%d' % (4 * i + 3), 'F2_%d' % (4 * i + 2)))
+
+    pairs = fan1 + fan2
+
+    vocab = spa.Vocabulary(dimensions, max_similarity=0.9, rng=rng)
+    items = set()
+    for i1, i2 in pairs:
+        items.add(i1)
+        items.add(i2)
+    for item in items:
+        vocab.populate(item)
+
+    fan1_vecs = vecs_from_list(vocab, fan1, norm)
+    fan2_vecs = vecs_from_list(vocab, fan2, norm)
+
+    return vocab, fan1, fan1_vecs, fan2, fan2_vecs, foil1, foil1_vecs, foil2, foil2_vecs
 
 
 def spa_parse_norm(vocab: spa.Vocabulary, spa_str: str):
@@ -26,7 +71,7 @@ def norm_spa_vecs(vocab: spa.Vocabulary, spa_strs: List[str]):
 
 def make_fan_vocab(seed, dimensions: int):
     rng = np.random.RandomState(seed=seed)
-    vocab = spa.Vocabulary(dimensions, rng=rng)
+    vocab = spa.Vocabulary(dimensions, rng=rng, strict=False)
 
     fan1 = ["CAT+DOG", "DUCK+FISH", "HORSE+COW"]
     fan1_vecs = norm_spa_vecs(vocab, fan1)

@@ -1,6 +1,7 @@
 """make a plot showing how the response changes as a function of the voja rate and number of neurons"""
 
 import numpy as np
+import h5py
 
 import nengo
 
@@ -36,7 +37,7 @@ def is_ans(t, x):
         return -1
 
 
-def run_feed(neuron_num: int, vr: float, net_seed):
+def train_net(neuron_num: int, vr: float, train_rep: int, net_seed):
     data_feed = BasicVecFeed(all_vecs, all_vecs, t_present, dimensions, len(all_vecs), t_pause)
 
     with nengo.Network(seed=net_seed) as train_model:
@@ -59,12 +60,19 @@ def run_feed(neuron_num: int, vr: float, net_seed):
         train_model.p_dec = nengo.Probe(mem.conn_out, 'weights', sample_every=0.1)
 
     with nengo.Simulator(train_model) as sim:
-        sim.run(len(all_labels) * (t_present + t_pause) * 20 + t_pause)
+        sim.run(len(all_labels) * (t_present + t_pause) * train_rep + t_pause)
 
     load_from = dict()
     load_from["enc"] = sim.data[train_model.p_enc][-1].copy()
     load_from["dec"] = sim.data[train_model.p_dec][-1].copy()
     load_from["seed"] = seed
+
+    return load_from
+
+
+def run_feed(neuron_num: int, vr: float, train_rep: int, net_seed):
+
+    load_from = train_net(neuron_num, vr, train_rep, net_seed)
 
     data_feed = BasicVecFeed(all_vecs, all_vecs, t_present, dimensions, len(all_vecs), t_pause)
 
@@ -111,87 +119,29 @@ def run_feed(neuron_num: int, vr: float, net_seed):
 
         foil_resp.append(meg_from_spikes(
             np.concatenate(
-                (np.zeros((100, neuron_num)), sim.data[p_spikes]), axis=0))
+                (np.zeros((100, neuron_num)), sim.data[p_spikes]), axis=0))[100:]
         )
 
     foil_resp = np.array(foil_resp).T
 
-    return fan1_resp, fan2_resp, foil_resp
+    return {"fan1": fan1_resp, "fan2": fan2_resp, "foil": foil_resp}
 
-
-# df_cols = ("t_idx", "metric", "n_neurons", "learning_rate", "seed")
-# resp_df = pd.DataFrame(columns=df_cols)
-# mean_df = pd.DataFrame(columns=df_cols)
-
-# Show effect of different number of neurons
-n_neurons = (10, 30, 50)
-
-nrn_fan1_resp = dict()
-nrn_fan2_resp = dict()
-nrn_foil_resp = dict()
-
-nrn_fan1_mean = dict()
-nrn_fan2_mean = dict()
-nrn_foil_mean = dict()
-
-for nrn in n_neurons:
-    nrn_fan1_resp[nrn] = []
-    nrn_fan2_resp[nrn] = []
-    nrn_foil_resp[nrn] = []
-
-    nrn_fan1_mean[nrn] = []
-    nrn_fan2_mean[nrn] = []
-    nrn_foil_mean[nrn] = []
-
-
-for sd in range(10):
-    for nrn in n_neurons:
-        res = run_feed(nrn, 1e-4, sd)
-
-        nrn_fan1_resp[nrn].append(res[0])
-        nrn_fan2_resp[nrn].append(res[1])
-        nrn_foil_resp[nrn].append(res[2])
-
-        nrn_fan1_mean[nrn].append(np.mean(res[0], axis=0))
-        nrn_fan2_mean[nrn].append(np.mean(res[1], axis=0))
-        nrn_foil_mean[nrn].append(np.mean(res[2], axis=0))
-
-np.savez("data/nrn_dat",
-         fan1_resp=nrn_fan1_resp, fan2_resp=nrn_fan2_resp, foil_resp=nrn_foil_resp,
-         fan1_mean=nrn_fan1_mean, fan2_mean=nrn_fan2_mean, foil_mean=nrn_foil_mean)
 
 # Show effect of different learning rate
-voja_rate = (1e-3, 1e-4, 1e-5)
+n_reps = (15, 20, 25)
+nrn = 50
+voja_rate = 1e-5
 
-vr_fan1_resp = dict()
-vr_fan2_resp = dict()
-vr_foil_resp = dict()
+with h5py.File("data/rep_exp.h5", "w") as fi:
+    for reps in n_reps:
+        v_grp = fi.create_group(str(reps))
 
-vr_fan1_mean = dict()
-vr_fan2_mean = dict()
-vr_foil_mean = dict()
+        for sd in range(10):
+            sd_grp = v_grp.create_group(str(sd))
+            sd_grp.attrs["n_neurons"] = nrn
+            sd_grp.attrs["learning_rate"] = voja_rate
+            sd_grp.attrs["seed"] = sd
+            res = run_feed(nrn, voja_rate, reps, sd)
 
-for vr in voja_rate:
-    vr_fan1_resp[vr] = []
-    vr_fan2_resp[vr] = []
-    vr_foil_resp[vr] = []
-
-    vr_fan1_mean[vr] = []
-    vr_fan2_mean[vr] = []
-    vr_foil_mean[vr] = []
-
-for sd in range(10):
-    for vr in voja_rate:
-        res = run_feed(10, vr, sd)
-
-        vr_fan1_resp[vr].append(res[0])
-        vr_fan2_resp[vr].append(res[1])
-        vr_foil_resp[vr].append(res[2])
-
-        vr_fan1_mean[vr].append(np.mean(res[0], axis=0))
-        vr_fan2_mean[vr].append(np.mean(res[1], axis=0))
-        vr_foil_mean[vr].append(np.mean(res[2], axis=0))
-
-np.savez("data/vr_dat",
-         fan1_resp=vr_fan1_resp, fan2_resp=vr_fan2_resp, foil_resp=vr_foil_resp,
-         fan1_mean=vr_fan1_mean, fan2_mean=vr_fan2_mean, foil_mean=vr_foil_mean)
+            for key, val in res.items():
+                sd_grp.create_dataset(key, data=val)
