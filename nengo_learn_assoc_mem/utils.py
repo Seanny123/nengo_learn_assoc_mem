@@ -2,11 +2,70 @@ import nengo
 import nengo_spa as spa
 import numpy as np
 
-from random import shuffle
+from random import shuffle, sample
 
 from typing import Sequence, List, Tuple
 
 dt = 0.001
+
+
+def gen_fan1_pairs(n_items: int):
+    src = ['F1_%d' % i for i in range(2 * n_items)]
+
+    fan1 = [(f1, f2) for f1, f2 in zip(src[::2], src[1::2])]
+    half_way = len(src) // 2
+    foil1 = [(f1, f2) for f1, f2 in zip(src[:half_way], src[half_way:])]
+
+    return fan1, foil1
+
+
+def gen_fan2_pairs(n_items: int):
+    pick_lim = 2
+
+    # you can only use uneven numbers
+    assert n_items % 2 == 1
+    src = ['F2_%d' % i for i in range(n_items)]
+
+    indices = set(range(len(src)))
+
+    picked = list(np.zeros(len(src), dtype=int))
+    picked_lim = set()
+    picked_pairs = {n: set() for n in range(len(src))}
+
+    fan2 = []
+    foil2 = []
+
+    for n in range(n_items):
+        a_pick = indices - picked_lim
+        if len(a_pick) == 0:
+            break
+        a_idx = sample(a_pick, 1)[0]
+
+        picked[a_idx] += 1
+        if picked[a_idx] == pick_lim:
+            picked_lim.add(a_idx)
+
+        b_pick = indices - {a_idx} - picked_lim - picked_pairs[a_idx]
+        if len(b_pick) == 0:
+            break
+        b_idx = sample(b_pick, 1)[0]
+
+        picked[b_idx] += 1
+        if picked[b_idx] == pick_lim:
+            picked_lim.add(b_idx)
+
+        picked_pairs[a_idx].add(b_idx)
+        picked_pairs[b_idx].add(a_idx)
+
+        fan2.append((src[a_idx], src[b_idx]))
+
+    for key, val in picked_pairs.items():
+
+        foil_pick = indices - val - {key}
+        foil_idx = sample(foil_pick, 1)[0]
+        foil2.append((src[key], src[foil_idx]))
+
+    return fan2, foil2
 
 
 def vecs_from_list(vocab: spa.Vocabulary, spa_strs: List[Tuple[str, str]], norm=False) -> List[np.ndarray]:
@@ -22,21 +81,11 @@ def vecs_from_list(vocab: spa.Vocabulary, spa_strs: List[Tuple[str, str]], norm=
     return res
 
 
-def make_alt_vocab(n_items: int, dimensions: int, seed, norm=False):
+def make_alt_vocab(n_fan1_items: int, n_fan2_items: int, dimensions: int, seed, norm=False):
     rng = np.random.RandomState(seed=seed)
 
-    fan1 = []
-    foil1 = []
-    for i in range(int(n_items / 5)):
-        fan1.append(('F1_%d' % (2 * i), 'F1_%d' % (2 * i + 1)))
-        foil1.append(('F1_%d' % (2 * i), 'F1_%d' % (2 * i + 1)))
-
-    fan2 = []
-    for i in range(int(n_items / 5)):
-        fan2.append(('F2_%d' % (4 * i), 'F2_%d' % (4 * i + 1)))
-        fan2.append(('F2_%d' % (4 * i), 'F2_%d' % (4 * i + 2)))
-        fan2.append(('F2_%d' % (4 * i + 3), 'F2_%d' % (4 * i + 1)))
-        fan2.append(('F2_%d' % (4 * i + 3), 'F2_%d' % (4 * i + 2)))
+    fan1, foil1 = gen_fan1_pairs(n_fan1_items)
+    fan2, foil2 = gen_fan2_pairs(n_fan2_items)
 
     pairs = fan1 + fan2
 
@@ -49,7 +98,9 @@ def make_alt_vocab(n_items: int, dimensions: int, seed, norm=False):
         vocab.populate(item)
 
     fan1_vecs = vecs_from_list(vocab, fan1, norm)
+    foil1_vecs = vecs_from_list(vocab, foil1, norm)
     fan2_vecs = vecs_from_list(vocab, fan2, norm)
+    foil2_vecs = vecs_from_list(vocab, foil2, norm)
 
     return vocab, fan1, fan1_vecs, fan2, fan2_vecs, foil1, foil1_vecs, foil2, foil2_vecs
 
