@@ -19,6 +19,26 @@ def gen_fan1_pairs(n_items: int):
     return fan1, foil1
 
 
+def gen_foil2_pairs(src, indices, picked_pairs, n_items: int):
+
+    foil_pairs = {n: set() for n in range(len(src))}
+    foil2 = []
+
+    for key, val in picked_pairs.items():
+
+        foil_pick = indices - val - {key} - foil_pairs[key]
+        for foil_idx in foil_pick:
+            foil2.append((src[key], src[foil_idx]))
+
+            if len(foil2) == n_items:
+                return foil2
+
+            foil_pairs[key].add(foil_idx)
+            foil_pairs[foil_idx].add(key)
+
+    return foil2
+
+
 def gen_fan2_pairs(n_items: int):
     pick_lim = 2
 
@@ -33,7 +53,6 @@ def gen_fan2_pairs(n_items: int):
     picked_pairs = {n: set() for n in range(len(src))}
 
     fan2 = []
-    foil2 = []
 
     for n in range(n_items):
         a_pick = indices - picked_lim
@@ -59,11 +78,7 @@ def gen_fan2_pairs(n_items: int):
 
         fan2.append((src[a_idx], src[b_idx]))
 
-    for key, val in picked_pairs.items():
-
-        foil_pick = indices - val - {key}
-        foil_idx = sample(foil_pick, 1)[0]
-        foil2.append((src[key], src[foil_idx]))
+    foil2 = gen_foil2_pairs(src, indices, picked_pairs, n_items)
 
     return fan2, foil2
 
