@@ -2,7 +2,8 @@ import nengo
 import nengo_spa as spa
 import numpy as np
 
-from random import shuffle, sample
+from random import shuffle
+import itertools
 
 from typing import Sequence, List, Tuple
 
@@ -19,14 +20,15 @@ def gen_fan1_pairs(n_items: int):
     return fan1, foil1
 
 
-def gen_foil2_pairs(src, indices, picked_pairs, n_items: int):
+def gen_foil2_pairs(src, picked_pairs, n_items: int):
 
+    indices = set(range(len(src)))
     foil_pairs = {n: set() for n in range(len(src))}
     foil2 = []
 
     for key, val in picked_pairs.items():
 
-        foil_pick = indices - val - {key} - foil_pairs[key]
+        foil_pick = indices - {key} - val - foil_pairs[key]
         for foil_idx in foil_pick:
             foil2.append((src[key], src[foil_idx]))
 
@@ -40,45 +42,26 @@ def gen_foil2_pairs(src, indices, picked_pairs, n_items: int):
 
 
 def gen_fan2_pairs(n_items: int):
-    pick_lim = 2
-
-    # you can only use uneven numbers
+    assert n_items > 3
     assert n_items % 2 == 1
     src = ['F2_%d' % i for i in range(n_items)]
 
-    indices = set(range(len(src)))
-
-    picked = list(np.zeros(len(src), dtype=int))
-    picked_lim = set()
     picked_pairs = {n: set() for n in range(len(src))}
 
     fan2 = []
 
-    for n in range(n_items):
-        a_pick = indices - picked_lim
-        if len(a_pick) == 0:
-            break
-        a_idx = sample(a_pick, 1)[0]
+    d_list = list(itertools.chain(*zip(range(n_items), range(n_items))))
+    d_list.append(d_list.pop(0))
+    for i1, i2 in zip(d_list[::2], d_list[1::2]):
+        fan2.append((src[i1], src[i2]))
+        picked_pairs[i1].add(i2)
+        picked_pairs[i2].add(i1)
 
-        picked[a_idx] += 1
-        if picked[a_idx] == pick_lim:
-            picked_lim.add(a_idx)
+    assert len(fan2) == n_items
 
-        b_pick = indices - {a_idx} - picked_lim - picked_pairs[a_idx]
-        if len(b_pick) == 0:
-            break
-        b_idx = sample(b_pick, 1)[0]
+    foil2 = gen_foil2_pairs(src, picked_pairs, n_items)
 
-        picked[b_idx] += 1
-        if picked[b_idx] == pick_lim:
-            picked_lim.add(b_idx)
-
-        picked_pairs[a_idx].add(b_idx)
-        picked_pairs[b_idx].add(a_idx)
-
-        fan2.append((src[a_idx], src[b_idx]))
-
-    foil2 = gen_foil2_pairs(src, indices, picked_pairs, n_items)
+    assert len(fan2) == len(foil2)
 
     return fan2, foil2
 
@@ -96,11 +79,29 @@ def vecs_from_list(vocab: spa.Vocabulary, spa_strs: List[Tuple[str, str]], norm=
     return res
 
 
+def check_fan_foil(fan, foil):
+    foil_items = set()
+
+    for i1, i2 in foil:
+        foil_items.add(i1)
+        foil_items.add(i2)
+
+    fan_items = set()
+
+    for i1, i2 in fan:
+        fan_items.add(i1)
+        fan_items.add(i2)
+
+    assert len(foil_items - fan_items) == 0
+
+
 def make_alt_vocab(n_fan1_items: int, n_fan2_items: int, dimensions: int, seed, norm=False):
     rng = np.random.RandomState(seed=seed)
 
     fan1, foil1 = gen_fan1_pairs(n_fan1_items)
+    check_fan_foil(fan1, foil1)
     fan2, foil2 = gen_fan2_pairs(n_fan2_items)
+    check_fan_foil(fan2, foil2)
 
     pairs = fan1 + fan2
 
