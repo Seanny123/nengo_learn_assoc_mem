@@ -43,7 +43,6 @@ def gen_foil2_pairs(src, picked_pairs, n_items: int):
 
 def gen_fan2_pairs(n_items: int):
     assert n_items > 3
-    assert n_items % 2 == 1
     src = ['F2_%d' % i for i in range(n_items)]
 
     picked_pairs = {n: set() for n in range(len(src))}
