@@ -154,7 +154,7 @@ def meg_from_spikes(spikes: np.ndarray, meg_syn=0.1):
     return nengo.Lowpass(meg_syn).filt(np.sum(spikes, axis=1))
 
 
-def gen_feed_func(vocab, vocab_items, t_present: float):
+def gen_feed_func(vocab, vocab_items: List[str], t_present: float):
 
     def f(t):
         index = int(t / t_present)
