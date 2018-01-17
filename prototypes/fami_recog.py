@@ -21,8 +21,8 @@ def choose_encoders(n_neurons: int, dimensions: int, encoder_proportion: float, 
     return encoders
 
 
-D = 64
-de_n_neurons = 1000
+D = 32
+de_n_neurons = 500
 ea_n_neurons = 100
 
 seed = 8
@@ -34,7 +34,7 @@ t_pause = 0.1
 integ_tau = 0.1
 
 vocab, fan1, fan1_pair_vecs, fan2, fan2_pair_vecs, \
-    foil1, foil1_pair_vecs, foil2, foil2_pair_vecs = make_alt_vocab(16, 16, D, seed, norm=True)
+    foil1, foil1_pair_vecs, foil2, foil2_pair_vecs = make_alt_vocab(5, 5, D, seed, norm=True)
 mean_fan1_pair = np.mean(fan1_pair_vecs, axis=0)
 mean_fan2_pair = np.mean(fan2_pair_vecs, axis=0)
 
@@ -47,7 +47,7 @@ ff_pairs = [f"{f1}+{f2}" for f1, f2 in fan_and_foil]
 encs = choose_encoders(de_n_neurons, D, p_fan, mean_fan1_pair, mean_fan2_pair)
 
 all_vecs = fan1_pair_vecs + fan2_pair_vecs + foil1_pair_vecs + foil2_pair_vecs
-# targets = 1, foil = 0
+# Note: targets = 1, foil = 0
 target_ans = [1] * (len(fan1) + len(fan2))
 foil_ans = [0] * (len(foil1) + len(foil2))
 all_ans = target_ans + foil_ans
@@ -75,14 +75,13 @@ with spa.Network("Associative Model", seed=seed) as model:
     for ea in model.accum.ea_ensembles:
         nengo.Connection(ea, ea, synapse=integ_tau)
 
-    accum_neurons = model.accum.add_neuron_input()
     model.decision = spa.Compare(vocab)
 
     nengo.Connection(model.famili.output, model.designed_ensemble)
     nengo.Connection(model.designed_ensemble, model.cleanup.input)
     nengo.Connection(model.cleanup.output, model.accum.input, synapse=integ_tau)
-    nengo.Connection(model.accum_reset, accum_neurons,
-                     transform=np.ones((ea_n_neurons*D, 1) * -3),
+    nengo.Connection(model.accum_reset, model.accum.add_neuron_input(),
+                     transform=np.ones((ea_n_neurons*D, 1)) * -3,
                      synapse=None)
     nengo.Connection(model.accum.output, model.decision.input_a)
     nengo.Connection(model.stim, model.decision.input_b)
@@ -95,5 +94,5 @@ with spa.Network("Associative Model", seed=seed) as model:
     p_cor = nengo.Probe(model.correct, synapse=None)
     p_out = nengo.Probe(model.decision.output, synapse=0.01)
 
-with nengo.Simulator as sim:
+with nengo.Simulator(model) as sim:
     sim.run(len(all_vecs)*(t_present+t_pause) + t_pause)
