@@ -1,5 +1,4 @@
-"""Model from the familiarity output to the recognition"""
-
+"""Model from the vision output until the recognition"""
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -49,17 +48,28 @@ ff_pairs = [f"{f1}+{f2}" for f1, f2 in fan_and_foil]
 encs = choose_encoders(de_n_neurons, D, p_fan, mean_fan1_pair, mean_fan2_pair)
 
 all_vecs = fan1_pair_vecs + fan2_pair_vecs + foil1_pair_vecs + foil2_pair_vecs
+concat_vecs = [np.concatenate((v1, v2)) for v1, v2 in all_vecs]
 # Note: targets = 1, foil = -1
 target_ans = [1] * (len(fan1) + len(fan2))
 foil_ans = [-1] * (len(foil1) + len(foil2))
 all_ans = target_ans + foil_ans
 
-feed = VecToScalarFeed(all_vecs, all_ans, t_present, t_pause)
+feed = VecToScalarFeed(concat_vecs, all_ans, t_present, t_pause)
 
 with spa.Network("Associative Model", seed=seed) as model:
-    model.famili = nengo.Node(feed.feed)
+    model.stim = nengo.Node(feed.feed)
     model.correct = nengo.Node(feed.get_answer)
     model.reset = nengo.Node(lambda t: feed.paused)
+
+    model.famili_a = spa.WTAAssocMem(
+        input_vocab=vocab,
+        threshold=0.3,
+        function=lambda x: x > 0.)
+
+    model.famili_b = spa.WTAAssocMem(
+        input_vocab=vocab,
+        threshold=0.3,
+        function=lambda x: x > 0.)
 
     model.designed_ensemble = nengo.Ensemble(de_n_neurons, D, encoders=encs)
 
@@ -76,7 +86,10 @@ with spa.Network("Associative Model", seed=seed) as model:
 
     model.decision = spa.Compare(vocab)
 
-    nengo.Connection(model.famili, model.designed_ensemble)
+    nengo.Connection(model.stim[:D], model.famili_a.input)
+    nengo.Connection(model.stim[D:], model.famili_b.input)
+    nengo.Connection(model.famili_a.output, model.designed_ensemble[:D])
+    nengo.Connection(model.famili_b.output, model.designed_ensemble[D:])
     nengo.Connection(model.designed_ensemble, model.cleanup.input)
     nengo.Connection(model.cleanup.output, model.accum.input,
                      synapse=integ_tau)
