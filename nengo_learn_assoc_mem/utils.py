@@ -10,6 +10,14 @@ from typing import Sequence, List, Tuple
 dt = 0.001
 
 
+def list_as_ascii(li: List[str]):
+    return [l.encode("ascii", "ignore") for l in li]
+
+
+def gen_added_strings(pairs):
+    return [f"{p1}+{p2}" for p1, p2 in pairs]
+
+
 def gen_fan1_pairs(n_items: int):
     src = ['F1_%d' % i for i in range(2 * n_items)]
 
