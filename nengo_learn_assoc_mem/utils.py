@@ -218,3 +218,17 @@ class BasicVecFeed(object):
             self.paused = True
 
         return np.zeros(self.dims)
+
+
+class VecToScalarFeed(BasicVecFeed):
+
+    def __init__(self, dataset: Sequence, correct: Sequence, t_len: float, pause: float):
+        dims = len(dataset[0])
+        n_items = len(dataset)
+        super(VecToScalarFeed, self).__init__(dataset, correct, t_len, dims, n_items, pause)
+
+    def get_answer(self, t):
+        if self.pause_time < self.time < self.ans_duration:
+            return self.correct[self.indices[self.data_index]]
+        else:
+            return 0

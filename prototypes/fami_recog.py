@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import nengo
 import nengo_spa as spa
 
-from nengo_learn_assoc_mem.utils import make_alt_vocab, BasicVecFeed
+from nengo_learn_assoc_mem.utils import make_alt_vocab, VecToScalarFeed
 
 
 def choose_encoders(n_neurons: int, dimensions: int, encoder_proportion: float, mean_fan1, mean_fan2):
@@ -22,7 +22,7 @@ def choose_encoders(n_neurons: int, dimensions: int, encoder_proportion: float, 
 
 
 D = 32
-de_n_neurons = 500
+de_n_neurons = 1000
 ea_n_neurons = 100
 
 seed = 8
@@ -47,15 +47,17 @@ ff_pairs = [f"{f1}+{f2}" for f1, f2 in fan_and_foil]
 encs = choose_encoders(de_n_neurons, D, p_fan, mean_fan1_pair, mean_fan2_pair)
 
 all_vecs = fan1_pair_vecs + fan2_pair_vecs + foil1_pair_vecs + foil2_pair_vecs
-# Note: targets = 1, foil = 0
+# Note: targets = 1, foil = -1
 target_ans = [1] * (len(fan1) + len(fan2))
-foil_ans = [0] * (len(foil1) + len(foil2))
+foil_ans = [-1] * (len(foil1) + len(foil2))
 all_ans = target_ans + foil_ans
-feed = BasicVecFeed(all_vecs, all_ans, t_present, D, len(all_vecs), t_pause)
+
+feed = VecToScalarFeed(all_vecs, all_ans, t_present, t_pause)
 
 with spa.Network("Associative Model", seed=seed) as model:
     model.stim = nengo.Node(feed.feed)
     model.correct = nengo.Node(feed.get_answer)
+    model.reset = nengo.Node(lambda t: feed.paused)
 
     model.famili = spa.WTAAssocMem(
         input_vocab=vocab,
@@ -77,9 +79,13 @@ with spa.Network("Associative Model", seed=seed) as model:
 
     model.decision = spa.Compare(vocab)
 
+    nengo.Connection(model.stim, model.famili.input)
     nengo.Connection(model.famili.output, model.designed_ensemble)
     nengo.Connection(model.designed_ensemble, model.cleanup.input)
-    nengo.Connection(model.cleanup.output, model.accum.input, synapse=integ_tau)
+    nengo.Connection(model.cleanup.output, model.accum.input,
+                     synapse=integ_tau)
+    nengo.Connection(model.reset, model.accum_reset,
+                     synapse=None)
     nengo.Connection(model.accum_reset, model.accum.add_neuron_input(),
                      transform=np.ones((ea_n_neurons*D, 1)) * -3,
                      synapse=None)
@@ -91,8 +97,11 @@ with spa.Network("Associative Model", seed=seed) as model:
     # for am_ens in model.famili.selection.thresholding.ea_ensembles:
     #     famili_spikes.append(nengo.Probe(am_ens.neurons))
 
+    p_in = nengo.Probe(model.stim, synapse=None)
+    p_accum = nengo.Probe(model.accum.output, synapse=0.01)
+    p_clean = nengo.Probe(model.cleanup.output, synapse=0.01)
     p_cor = nengo.Probe(model.correct, synapse=None)
-    p_out = nengo.Probe(model.decision.output, synapse=0.01)
+    p_out = nengo.Probe(model.decision.output, synapse=0.1)
 
 with nengo.Simulator(model) as sim:
     sim.run(len(all_vecs)*(t_present+t_pause) + t_pause)
