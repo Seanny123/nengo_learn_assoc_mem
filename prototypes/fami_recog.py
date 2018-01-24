@@ -31,7 +31,7 @@ seed = 8
 p_fan = 0.85
 
 t_present = 0.3
-t_pause = 0.1
+t_pause = 0.2
 
 integ_tau = 0.1
 
@@ -76,6 +76,7 @@ with spa.Network("Associative Model", seed=seed) as model:
         nengo.Connection(ea, ea, synapse=integ_tau)
 
     model.decision = spa.Compare(vocab)
+    # TODO: add a thresholding ensemble to the output of the decision
 
     nengo.Connection(model.famili, model.designed_ensemble)
     nengo.Connection(model.designed_ensemble, model.cleanup.input)
@@ -102,7 +103,11 @@ with nengo.Simulator(model) as sim:
     sim.run(len(all_vecs)*(t_present+t_pause) + t_pause)
 
 with h5py.File("data/fami_sys_run.h5py", "w") as fi:
-    fi.create_dataset("t_range", [len(sim.trange()), sim.dt])
+    fi.attr("t_range", len(sim.trange()))
+    fi.attr("dt", sim.dt)
+    fi.attr("t_pause", t_pause)
+    fi.attr("t_present", t_present)
+    fi.attr("dimensions", D)
 
     pnt_nms = []
     pnt_vectors = []
