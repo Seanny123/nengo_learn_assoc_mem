@@ -88,7 +88,7 @@ with spa.Network("Associative Model", seed=seed) as model:
     nengo.Connection(model.accum_reset, model.accum.add_neuron_input(),
                      transform=np.ones((ea_n_neurons*D, 1)) * -3,
                      synapse=None)
-    nengo.Connection(model.accum_reset, model.cleanup.input_reset, synapse=None)
+
     nengo.Connection(model.accum.output, model.decision.input_a)
     nengo.Connection(model.famili, model.decision.input_b)
 
