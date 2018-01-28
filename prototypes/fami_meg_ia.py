@@ -1,6 +1,5 @@
 """Model from the familiarity output to the recognition with an IA cleanup"""
 
-import numpy as np
 import h5py
 
 import nengo
@@ -13,7 +12,6 @@ from collections import OrderedDict
 
 
 D = 32
-ea_n_neurons = 50
 seed = 8
 
 t_present = 0.3
@@ -29,7 +27,6 @@ all_fan = fan1 + fan2
 all_fan_pairs = gen_added_strings(all_fan)
 
 fan_and_foil = fan1 + fan2 + foil1 + foil2
-ff_pairs = gen_added_strings(fan_and_foil)
 
 all_vecs = fan1_pair_vecs + fan2_pair_vecs + foil1_pair_vecs + foil2_pair_vecs
 # Note: targets = 1, foil = -1
@@ -44,7 +41,7 @@ with spa.Network("Associative Model", seed=seed) as model:
     model.correct = nengo.Node(feed.get_answer)
     model.reset = nengo.Node(lambda t: feed.paused)
 
-    n_accum_neurons = [25] * len(fan1) + [45] * len(fan2)
+    n_accum_neurons = [45] * len(fan1) + [35] * len(fan2)
     n_thresh_neurons = [15] * len(all_fan)
     model.cleanup = MegAssociativeMemory(n_accum_neurons=n_accum_neurons,
                                          n_thresholding_neurons=n_thresh_neurons,
@@ -60,15 +57,11 @@ with spa.Network("Associative Model", seed=seed) as model:
     p_clean = nengo.Probe(model.cleanup.output, synapse=0.01, label="clean")
     p_cor = nengo.Probe(model.correct, synapse=None, label="correct")
 
-    p_spikes = []
-
-    for am_ens in model.cleanup.selection.thresholding.ea_ensembles:
-        p_spikes.append(nengo.Probe(am_ens.neurons))
 
 with nengo.Simulator(model) as sim:
     sim.run(len(all_vecs)*(t_present+t_pause) + t_pause)
 
-with h5py.File("data/meg_ia.h5py", "w") as fi:
+with h5py.File("data/accum_ia_small.h5py", "w") as fi:
     tm = fi.create_dataset("t_range", data=[0, sim.trange()[-1]])
     tm.attrs["dt"] = float(sim.dt)
     tm.attrs["t_pause"] = t_pause

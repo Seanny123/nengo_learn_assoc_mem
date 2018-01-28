@@ -6,7 +6,7 @@ import nengo_spa as spa
 
 from nengo_learn_assoc_mem.utils import numpy_bytes_to_str, norm_spa_vecs
 
-with h5py.File("data/fami_ia_full.h5py", "r") as fi:
+with h5py.File("data/meg_ia_full.h5py", "r") as fi:
     print(list(fi.keys()))
     inp = list(np.array(fi['input']))
 
@@ -19,13 +19,12 @@ with h5py.File("data/fami_ia_full.h5py", "r") as fi:
     v_vecs = list(fi['vocab_vectors'])
     D = fi['vocab_vectors'].attrs['dimensions']
 
-    accum = list(np.array(fi['accum']))
+    accum = list(np.array(fi['clean']))
 
     dt = fi['t_range'].attrs['dt']
     t_range = np.arange(fi['t_range'][0], fi['t_range'][1], dt)
     t_pause = fi['t_range'].attrs['t_pause']
     t_present = fi['t_range'].attrs['t_present']
-
 
 vocab = spa.Vocabulary(D)
 for val, vec in zip(v_strs, v_vecs):
@@ -64,6 +63,6 @@ with nengo.Simulator(model) as sim:
     sim.run(t_range[-1])
 
 
-with h5py.File("data/fami_ia_full.h5py", "w") as fi:
+with h5py.File("data/meg_ia_full.h5py", "w") as fi:
     fi.create_dataset("noise_out", data=sim.data[p_noise_out])
     fi.create_dataset("clean_out", data=sim.data[p_clean_out])
