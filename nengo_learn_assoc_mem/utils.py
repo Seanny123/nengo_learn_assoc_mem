@@ -10,6 +10,24 @@ from typing import Sequence, List, Tuple
 dt = 0.001
 
 
+def choose_encoders(n_neurons: int, dimensions: int, encoder_proportion: float, mean_fan1, mean_fan2):
+    encoders = np.zeros((n_neurons, dimensions))
+
+    fan1_end = int(n_neurons * encoder_proportion)
+
+    for n_i in range(fan1_end):
+        encoders[n_i] = mean_fan1 + np.random.normal(size=dimensions) * 0.1
+
+    for n_i in range(fan1_end, n_neurons):
+        encoders[n_i] = mean_fan2 + np.random.normal(size=dimensions) * 0.1
+
+    return encoders
+
+
+def numpy_bytes_to_str(lst):
+    return [l.decode('utf-8') for l in lst]
+
+
 def scale_array(x, out_range=(-1, 1), axis=None):
     domain = np.min(x, axis), np.max(x, axis)
     y = (x - (domain[1] + domain[0]) / 2) / (domain[1] - domain[0])

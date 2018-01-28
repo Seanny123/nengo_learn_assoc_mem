@@ -9,26 +9,9 @@ import nengo_spa as spa
 
 from nengo_learn_assoc_mem.utils import make_alt_vocab, VecToScalarFeed, gen_added_strings, list_as_ascii
 
-
-def choose_encoders(n_neurons: int, dimensions: int, encoder_proportion: float, mean_fan1, mean_fan2):
-    encoders = np.zeros((n_neurons, dimensions))
-
-    fan1_end = int(n_neurons * encoder_proportion)
-
-    for n_i in range(fan1_end):
-        encoders[n_i] = mean_fan1 + np.random.normal(size=dimensions) * 0.1
-
-    for n_i in range(fan1_end, n_neurons):
-        encoders[n_i] = mean_fan2 + np.random.normal(size=dimensions) * 0.1
-
-    return encoders
-
-
 D = 32
 ea_n_neurons = 50
-
 seed = 8
-p_fan = 0.85
 
 t_present = 0.5
 t_pause = 0.6
@@ -38,8 +21,6 @@ n_pairs = 5
 
 vocab, fan1, fan1_pair_vecs, fan2, fan2_pair_vecs, \
     foil1, foil1_pair_vecs, foil2, foil2_pair_vecs = make_alt_vocab(n_pairs, n_pairs, D, seed, norm=True)
-mean_fan1_pair = np.mean(fan1_pair_vecs, axis=0)
-mean_fan2_pair = np.mean(fan2_pair_vecs, axis=0)
 
 all_fan = fan1 + fan2
 all_fan_pairs = gen_added_strings(all_fan)
