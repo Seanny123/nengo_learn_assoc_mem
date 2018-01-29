@@ -17,12 +17,12 @@ def run_react(p_vecs: np.ndarray, fi_name: str, noise_mag=0.1, reduce=0.8):
         in_nd = nengo.Node(lambda t: inp[int(t/dt)])
         accum_out = nengo.Node(lambda t: accum[int(t/dt)])
 
-        clean_cmp = spa.Compare(D)
+        clean_cmp = nengo.Node(lambda t, x: np.dot(x[:D], x[D:]))
 
-        nengo.Connection(accum_out, clean_cmp.input_a,
+        nengo.Connection(accum_out, clean_cmp[:D],
                          transform=p_vecs.T, synapse=None)
 
-        nengo.Connection(in_nd, clean_cmp.input_b, synapse=None)
+        nengo.Connection(in_nd, clean_cmp[:D], synapse=None)
 
         p_clean_out = nengo.Probe(clean_cmp.output, synapse=0.01)
 
@@ -71,4 +71,4 @@ pair_vecs = np.array(fan1_pair_vecs + fan2_pair_vecs)
 
 for noise, red in itertools.product((0.05, 0.1, 0.2), (0.7, 0.8, 0.9)):
     for run in range(10):
-        run_react(pair_vecs.copy(), f"react_explore_{run}_{noise}_{red}")
+        run_react(pair_vecs.copy(), f"fast_react_explore_{run}_{noise}_{red}")
