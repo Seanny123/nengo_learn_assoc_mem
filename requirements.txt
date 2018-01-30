@@ -2,3 +2,4 @@ nengo
 pytry
 numpy
 h5py
+hyperopt
