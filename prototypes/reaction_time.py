@@ -5,10 +5,20 @@ import nengo
 import nengo_spa as spa
 
 from nengo_learn_assoc_mem.utils import numpy_bytes_to_str, norm_spa_vecs
+
 import itertools
+import multiprocessing
+import os
+
+
+def iter_params(run_num: int, nois, reds):
+    for nn, re, in itertools.product(nois, reds):
+        for rr in range(run_num):
+            yield pair_vecs.copy(), f"actual_react_explore_{rr}_{nn}_{re}", nn, re
 
 
 def run_react(p_vecs: np.ndarray, fi_name: str, noise_mag=0.1, reduce=0.8):
+    print(fi_name)
     p_vecs[:len(fan1)] += np.random.normal(size=p_vecs[:len(fan1)].shape) * noise_mag
     p_vecs[len(fan1):] += np.random.normal(size=p_vecs[len(fan1):].shape) * noise_mag
     p_vecs[len(fan1):] *= reduce
@@ -26,7 +36,7 @@ def run_react(p_vecs: np.ndarray, fi_name: str, noise_mag=0.1, reduce=0.8):
 
         p_clean_out = nengo.Probe(clean_cmp.output, synapse=0.01)
 
-    with nengo.Simulator(model) as sim:
+    with nengo.Simulator(model, progress_bar=False) as sim:
         sim.run(t_range[-1])
 
     with h5py.File(f"data/{fi_name}.h5py", "w") as out_fi:
@@ -69,6 +79,8 @@ all_vecs = all_vecs / np.linalg.norm(all_vecs)
 
 pair_vecs = np.array(fan1_pair_vecs + fan2_pair_vecs)
 
-for noise, red in itertools.product((0.05, 0.1, 0.2), (0.7, 0.8, 0.9)):
-    for run in range(10):
-        run_react(pair_vecs.copy(), f"react_explore_{run}_{noise}_{red}")
+noises = (0.0, 0.9)
+reduces = (0.95, 1.0)
+
+with multiprocessing.Pool(os.cpu_count()) as pool:
+    pool.starmap(run_react, iter_params(10, noises, reduces))
