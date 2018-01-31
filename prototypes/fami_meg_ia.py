@@ -12,13 +12,13 @@ from collections import OrderedDict
 
 
 D = 32
-seed = 8
+seed = 7
 
 t_present = 0.3
 t_pause = 0.5
 
 integ_tau = 0.1
-n_pairs = 5
+n_pairs = 16
 
 vocab, fan1, fan1_pair_vecs, fan2, fan2_pair_vecs, \
     foil1, foil1_pair_vecs, foil2, foil2_pair_vecs = make_alt_vocab(n_pairs, n_pairs, D, seed, norm=True)
@@ -61,7 +61,7 @@ with spa.Network("Associative Model", seed=seed) as model:
 with nengo.Simulator(model) as sim:
     sim.run(len(all_vecs)*(t_present+t_pause) + t_pause)
 
-with h5py.File("data/accum_ia_small.h5py", "w") as fi:
+with h5py.File("data/meg_ia_full_shuffled.h5py", "w") as fi:
     tm = fi.create_dataset("t_range", data=[0, sim.trange()[-1]])
     tm.attrs["dt"] = float(sim.dt)
     tm.attrs["t_pause"] = t_pause

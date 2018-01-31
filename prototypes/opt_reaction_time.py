@@ -96,7 +96,7 @@ def loss_func(errs, react_tms):
 
 def opt_run_react(args):
     print(args)
-    thresh, fan1_noise_mag, fan1_reduce, fan2_noise_mag, fan2_reduce = args
+    thresh, fan1_noise_mag, fan2_noise_mag, fan1_reduce, fan2_reduce = args
 
     p_vecs = pair_vecs.copy()
     p_vecs[len(fan1):] += np.random.normal(size=p_vecs[len(fan1):].shape) * fan1_noise_mag
@@ -108,7 +108,7 @@ def opt_run_react(args):
     errs = {ff: [] for ff in f_in}
     rts = {ff: [] for ff in f_in}
 
-    for run in range(1):
+    for run in range(10):
 
         with spa.Network(seed=run) as model:
             in_nd = nengo.Node(lambda t: inp[int(t/dt)])
@@ -145,9 +145,7 @@ def opt_run_react(args):
             comp_slc = slice(last_idx, last_idx+len(lst))
 
             errs[lbl].append(np.sum(decs[comp_slc] != match_correct[comp_slc]) / len(lst))
-            print("err", lbl, errs[lbl])
             rts[lbl].append(np.mean(t_decs[comp_slc]))
-            print("rts", lbl, rts[lbl])
             last_idx += len(lst)
 
     return loss_func(errs, rts)

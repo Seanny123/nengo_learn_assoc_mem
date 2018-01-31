@@ -11,17 +11,22 @@ import multiprocessing
 import os
 
 
-def iter_params(run_num: int, nois, reds):
-    for nn, re, in itertools.product(nois, reds):
+def iter_params(run_num: int, f1_nois, f1_reds, f2_nois, f2_reds):
+    f1_prod = itertools.product(f1_nois, f1_reds)
+    f2_prod = itertools.product(f2_nois, f2_reds)
+    for (f1_nn, f1_re), (f2_nn, f2_re) in zip(f1_prod, f2_prod):
         for rr in range(run_num):
-            yield pair_vecs.copy(), f"actual_react_explore_{rr}_{nn}_{re}", nn, re
+            fi_nm = f"more_react_explore_{rr}_{f1_nn}_{f1_re}_{f2_nn}_{f2_re}"
+            yield pair_vecs.copy(), fi_nm, f1_nn, f1_re, f2_nn, f2_re
 
 
-def run_react(p_vecs: np.ndarray, fi_name: str, noise_mag=0.1, reduce=0.8):
+def run_react(p_vecs: np.ndarray, fi_name: str,
+              fan1_noise_mag: float, fan1_reduce: float, fan2_noise_mag: float, fan2_reduce: float):
     print(fi_name)
-    p_vecs[:len(fan1)] += np.random.normal(size=p_vecs[:len(fan1)].shape) * noise_mag
-    p_vecs[len(fan1):] += np.random.normal(size=p_vecs[len(fan1):].shape) * noise_mag
-    p_vecs[len(fan1):] *= reduce
+    p_vecs[len(fan1):] += np.random.normal(size=p_vecs[len(fan1):].shape) * fan1_noise_mag
+    p_vecs[:len(fan1)] += np.random.normal(size=p_vecs[:len(fan1)].shape) * fan2_noise_mag
+    p_vecs[len(fan1):] *= fan1_reduce
+    p_vecs[:len(fan1)] *= fan2_reduce
 
     with spa.Network() as model:
         in_nd = nengo.Node(lambda t: inp[int(t/dt)])
@@ -41,8 +46,10 @@ def run_react(p_vecs: np.ndarray, fi_name: str, noise_mag=0.1, reduce=0.8):
 
     with h5py.File(f"data/{fi_name}.h5py", "w") as out_fi:
         cl = out_fi.create_dataset("clean_out", data=sim.data[p_clean_out])
-        cl.attrs["noise"] = noise_mag
-        cl.attrs["reduce"] = reduce
+        cl.attrs["fan1_noise"] = fan1_noise_mag
+        cl.attrs["fan1_reduce"] = fan1_reduce
+        cl.attrs["fan2_noise"] = fan2_noise_mag
+        cl.attrs["fan2_reduce"] = fan2_reduce
 
 
 with h5py.File("data/meg_ia_full.h5py", "r") as fi:
@@ -74,13 +81,12 @@ fan2_pair_vecs = norm_spa_vecs(vocab, fan2)
 foil1_pair_vecs = norm_spa_vecs(vocab, foil1)
 foil2_pair_vecs = norm_spa_vecs(vocab, foil2)
 
-all_vecs = vocab.parse("+".join(list(vocab.keys()))).v
-all_vecs = all_vecs / np.linalg.norm(all_vecs)
-
 pair_vecs = np.array(fan1_pair_vecs + fan2_pair_vecs)
 
-noises = (0.0, 0.9)
-reduces = (0.95, 1.0)
+fan1_noises = (0.16,)
+fan1_reduces = (0.9,)
+fan2_noises = (0.03,)
+fan2_reduces = (0.95,)
 
 with multiprocessing.Pool(os.cpu_count()) as pool:
-    pool.starmap(run_react, iter_params(10, noises, reduces))
+    pool.starmap(run_react, iter_params(10, fan1_noises, fan1_reduces, fan2_noises, fan2_reduces))
