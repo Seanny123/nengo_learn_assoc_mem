@@ -3,3 +3,5 @@ pytry
 numpy
 h5py
 hyperopt
+matplotlib
+seaborn
