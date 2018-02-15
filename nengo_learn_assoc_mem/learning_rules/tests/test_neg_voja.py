@@ -3,7 +3,7 @@ import nengo
 import numpy as np
 import matplotlib.pyplot as plt
 
-from nengo_learn_assoc_mem.learning_rules.fake_voja import FakeVoja
+from nengo_learn_assoc_mem.learning_rules.neg_voja import NegVoja
 
 
 def cycle_array(x, period, dt=0.001):
@@ -33,7 +33,7 @@ with nengo.Simulator(model) as sim:
     pass
 
 enc = sim.data[ens].encoders
-fake_voja = FakeVoja(enc)
+fake_voja = NegVoja(enc)
 
 with nengo.Network() as model:
     in_nd = nengo.Node(cycle_array([[-rad_comp, -rad_comp], [rad_comp, rad_comp]], 0.1))
