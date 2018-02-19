@@ -5,9 +5,12 @@ import numpy as np
 
 class FakeVoja(nengo.Network):
 
-    def __init__(self, encoders: np.ndarray, post_tau=0.005, learning_rate=1e-3,
+    def __init__(self, encoders: np.ndarray, post_tau=0.005, learning_rate=1e-3, sample_every=0.1, dt=0.001,
                  label=None, seed=None, add_to_container=None):
         super().__init__(label, seed, add_to_container)
+
+        self.period = sample_every / dt
+        self.dt = dt
 
         self.dims = encoders.shape[1]
         self.encoders = encoders
@@ -34,7 +37,9 @@ class FakeVoja(nengo.Network):
         self.enabled = x
 
     def encode(self, t):
-        self.encoder_hist.append(self.encoders.copy())
         self.encoders += self.enabled * self.learning_rate * self.acts[:, None] * (self.encoders - self.in_sig)
+
+        if (t / self.dt % self.period) < 1:
+            self.encoder_hist.append(self.encoders.copy())
 
         return np.dot(self.encoders, self.in_sig)
