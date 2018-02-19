@@ -186,6 +186,19 @@ def meg_from_spikes(spikes: np.ndarray, meg_syn=0.1):
     return nengo.Lowpass(meg_syn).filt(np.sum(spikes, axis=1))
 
 
+def cycle_array(x, period, dt=0.001):
+    """Cycles through the elements"""
+    i_every = int(round(period / dt))
+    if i_every != period / dt:
+        raise ValueError("dt (%s) does not divide period (%s)" % (dt, period))
+
+    def f(t):
+        i = int(round((t - dt) / dt))  # t starts at dt
+        return x[int(i / i_every) % len(x)]
+
+    return f
+
+
 def gen_feed_func(vocab, vocab_items: List[str], t_present: float):
 
     def f(t):

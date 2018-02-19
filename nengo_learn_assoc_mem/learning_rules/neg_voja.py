@@ -9,14 +9,11 @@ class NegVoja(FakeVoja):
         super().__init__(encoders, post_tau, learning_rate)
         self.radius = radius
 
-    def encode(self, t, x):
-        in_sig = x[:self.dims]
-        acts = x[self.dims:]
-
+    def encode(self, t):
         self.encoder_hist.append(self.encoders.copy())
-        delta = self.learning_rate * acts[:, None] * (self.encoders - in_sig)
+        delta = self.enabled * self.learning_rate * self.acts[:, None] * (self.encoders - self.in_sig)
         mod_enc = self.encoders + delta
         mag = np.linalg.norm(mod_enc, axis=1)
         self.encoders = self.radius / mag[:, None] * mod_enc
 
-        return np.dot(self.encoders, in_sig)
+        return np.dot(self.encoders, self.in_sig)

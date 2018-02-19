@@ -1,27 +1,16 @@
 import nengo
+from nengo.utils.matplotlib import rasterplot
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 from nengo_learn_assoc_mem.learning_rules.fake_voja import FakeVoja
-
-
-def cycle_array(x, period, dt=0.001):
-    """Cycles through the elements"""
-    i_every = int(round(period / dt))
-    if i_every != period / dt:
-        raise ValueError("dt (%s) does not divide period (%s)" % (dt, period))
-
-    def f(t):
-        i = int(round((t - dt) / dt))  # t starts at dt
-        return x[int(i / i_every) % len(x)]
-
-    return f
+from nengo_learn_assoc_mem.utils import cycle_array
 
 
 dims = 2
-n_neurons = 10
-seed = 0
+n_neurons = 20
+seed = 2
 intercepts = [0.8]*n_neurons
 
 rad_comp = 1 / np.sqrt(2)
@@ -32,23 +21,64 @@ with nengo.Network() as model:
 with nengo.Simulator(model) as sim:
     pass
 
-enc = sim.data[ens].encoders
-fake_voja = FakeVoja(enc)
+enc = sim.data[ens].encoders.copy()
 
 with nengo.Network() as model:
     in_nd = nengo.Node(cycle_array([[-rad_comp, -rad_comp], [rad_comp, rad_comp]], 0.1))
+    enabled = nengo.Node(lambda t: 0. if t < 0.1 else 1.)
 
-    voja_nd = nengo.Node(fake_voja.encode, size_in=dims+n_neurons)
+    fake_voja = FakeVoja(enc, learning_rate=-1e-3)
     ens = nengo.Ensemble(n_neurons, dims, intercepts=intercepts, seed=seed)
 
-    nengo.Connection(in_nd, voja_nd[:dims], synapse=None)
-    nengo.Connection(ens.neurons, voja_nd[dims:], synapse=0)
-    nengo.Connection(voja_nd, ens.neurons, synapse=None)
+    nengo.Connection(in_nd, fake_voja.input_signal, synapse=None)
+    nengo.Connection(ens.neurons, fake_voja.input_activities, synapse=0)
+    nengo.Connection(enabled, fake_voja.enable, synapse=None)
+    nengo.Connection(fake_voja.output, ens.neurons, synapse=None)
 
-    p_in = nengo.Probe(in_nd, synapse=0.01)
+    p_in = nengo.Probe(in_nd)
+    p_spikes = nengo.Probe(ens.neurons)
 
 with nengo.Simulator(model) as sim:
     sim.run(1)
 
-plt.plot(sim.trange(), sim.data[p_in])
+# basic plot
+fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+ax1.plot(sim.trange(), sim.data[p_in])
+rasterplot(sim.trange(), sim.data[p_spikes], ax=ax2)
+plt.show()
+
+x_val = np.linspace(0, 2*np.pi, 50)
+circ = np.array([np.cos(x_val), np.sin(x_val)]).T
+enc_h = fake_voja.encoder_hist
+
+# first iteration plot
+plt.figure()
+
+win_pre = 10
+win_a = 100
+
+plt.scatter(circ[:, 0], circ[:, 1], color='k', alpha=0.2)
+plt.scatter(sim.data[p_in][win_pre][0], sim.data[p_in][win_pre][1], label="stim", s=200)
+
+plt.scatter(enc_h[0][:, 0], enc_h[0][:, 1], label="orig", s=100)
+plt.scatter(enc_h[win_pre][:, 0], enc_h[win_pre][:, 1], label="pre", s=50)
+plt.scatter(enc_h[win_a][:, 0], enc_h[win_a][:, 1], label="a", s=50)
+
+plt.legend()
+plt.show()
+
+# second iteration plot
+plt.figure()
+
+win_pre = 210
+win_a = 300
+
+plt.scatter(circ[:, 0], circ[:, 1], color='k', alpha=0.2)
+plt.scatter(sim.data[p_in][win_pre][0], sim.data[p_in][win_pre][1], label="stim", s=200)
+
+plt.scatter(enc_h[0][:, 0], enc_h[0][:, 1], label="orig", s=100)
+plt.scatter(enc_h[win_pre][:, 0], enc_h[win_pre][:, 1], label="pre", s=50)
+plt.scatter(enc_h[win_a][:, 0], enc_h[win_a][:, 1], label="a", s=50)
+
+plt.legend()
 plt.show()
