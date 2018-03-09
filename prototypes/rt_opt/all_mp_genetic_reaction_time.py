@@ -8,15 +8,32 @@ from nengo_learn_assoc_mem.utils import numpy_bytes_to_str, norm_spa_vecs
 from prototypes.rt_opt.opt_utils import decision, loss_func, f_in
 
 import multiprocessing
+from multiprocessing import dummy
 import os
 from collections import OrderedDict
 
 from typing import List, Tuple
 
+dt = 0.001  # monkey patch to just get things running
 
-def opt_iter(arg_lst, loss_lst):
+
+def sim_init(shared_inp, shared_accum_out, shared_dims, shared_t_range):
+    global in_func
+    in_func = shared_inp
+
+    global accum_output
+    accum_output = shared_accum_out
+
+    global dims
+    dims = shared_dims
+
+    global t_range
+    t_range = shared_t_range
+
+
+def opt_iter(arg_lst, loss_lst, init_args):
     for a_i, arg in enumerate(arg_lst):
-        yield a_i, arg, loss_lst
+        yield a_i, arg, loss_lst, init_args
 
 
 def sim_iter(n_runs: int, p_vecs, res_lst):
@@ -27,10 +44,10 @@ def sim_iter(n_runs: int, p_vecs, res_lst):
 def sim_net(run: int, p_vecs: np.ndarray, res_lst):
 
     with spa.Network(seed=run) as model:
-        in_nd = nengo.Node(lambda t: inp[int(t / dt)])
-        accum_out = nengo.Node(lambda t: accum[int(t / dt)])
+        in_nd = nengo.Node(lambda t: in_func[int(t / dt)])
+        accum_out = nengo.Node(lambda t: accum_output[int(t / dt)])
 
-        clean_cmp = spa.Compare(D)
+        clean_cmp = spa.Compare(dims)
 
         nengo.Connection(accum_out, clean_cmp.input_a,
                          transform=p_vecs.T, synapse=None)
@@ -45,15 +62,13 @@ def sim_net(run: int, p_vecs: np.ndarray, res_lst):
     res_lst.append(sim.data[p_clean_out].copy())
 
 
-def opt_run_react(a_idx: int, args, loss_lst: List):
+def opt_run_react(a_idx: int, args, loss_lst: List, init_args: Tuple):
     print(args)
     thresh, fan1_noise_mag, fan2_noise_mag, fan1_reduce, fan2_reduce = args
 
     fan1_len = len(f_strs['fan1'])
 
     p_vecs = pair_vecs.copy()
-    print(type(p_vecs))
-    print(type(p_vecs[0]))
     p_vecs[fan1_len:] += np.random.normal(size=p_vecs[fan1_len:].shape) * fan1_noise_mag
     p_vecs[:fan1_len] += np.random.normal(size=p_vecs[:fan1_len].shape) * fan2_noise_mag
     p_vecs[fan1_len:] *= fan1_reduce
@@ -65,7 +80,7 @@ def opt_run_react(a_idx: int, args, loss_lst: List):
     manager = multiprocessing.Manager()
     res_lst = manager.list()
 
-    with multiprocessing.Pool(os.cpu_count()) as pool:
+    with multiprocessing.Pool(os.cpu_count(), sim_init, init_args) as pool:
         pool.starmap(sim_net, sim_iter(10, p_vecs, res_lst))
 
     for res in res_lst:
@@ -117,7 +132,7 @@ def init_opt(shared_pair_vecs, shared_time_slices, shared_td_pause, shared_td_ea
     f_strs = shared_f_strs
 
 
-def genetic_opt(run_func, param_space: OrderedDict, init_args: Tuple, run_num: int, child_num=4):
+def genetic_opt(run_func, param_space: OrderedDict, thread_init_args: Tuple, proc_init_args, run_num: int, child_num=4):
     gen_manager = multiprocessing.Manager()
     loss_lst = gen_manager.list([np.inf for _ in range(child_num)])
 
@@ -130,11 +145,11 @@ def genetic_opt(run_func, param_space: OrderedDict, init_args: Tuple, run_num: i
 
     for r_n in range(run_num):
 
-        # TODO: just use threads, since the simulations are doing all the heavy lifting anyways
-        with multiprocessing.Pool(os.cpu_count(), init_opt, init_args) as pool:
-            pool.starmap(run_func, opt_iter(arg_list, loss_lst))
+        with dummy.Pool(os.cpu_count(), init_opt, thread_init_args) as pool:
+            pool.starmap(run_func, opt_iter(arg_list, loss_lst, proc_init_args))
 
         # given minimum loss, save it and spawn more children
+        print(f"Best of batch: {base_args}\n")
         fittest_idx = int(np.argmin(loss_lst))
         base_args = arg_list[fittest_idx]
 
@@ -170,7 +185,7 @@ if __name__ == '__main__':
 
         accum = list(np.array(fi['clean_accum']))
 
-        dt = fi['t_range'].attrs['dt']
+        #dt = fi['t_range'].attrs['dt']
         t_range = np.arange(fi['t_range'][0], fi['t_range'][1], dt)
         t_pause = fi['t_range'].attrs['t_pause']
         t_present = fi['t_range'].attrs['t_present']
@@ -203,7 +218,7 @@ if __name__ == '__main__':
         ('f2_reduced', (0.8, 1.0))
     ))
 
-    print(type(fan_pair_vecs[0]))
     initial_global_args = (fan_pair_vecs, all_time_slices, td_pause, td_each, f_strs)
+    initial_proc_args = (inp, accum, D, t_range)
 
-    best = genetic_opt(opt_run_react, space, initial_global_args, 200, 8)
+    best = genetic_opt(opt_run_react, space, initial_global_args, initial_proc_args, 200, 8)
