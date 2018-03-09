@@ -11,8 +11,17 @@ import multiprocessing
 from multiprocessing import dummy
 import os
 from collections import OrderedDict
+import logging
 
 from typing import List, Tuple
+
+# create logger with 'spam_application'
+logger = logging.getLogger('genetic_algo')
+logger.setLevel(logging.INFO)
+# create file handler which logs even debug messages
+fh = logging.FileHandler('results.log')
+fh.setLevel(logging.INFO)
+logger.addHandler(fh)
 
 dt = 0.001  # monkey patch to just get things running
 
@@ -105,6 +114,7 @@ def opt_run_react(a_idx: int, args, loss_lst: List, init_args: Tuple):
             last_idx += len(lst)
 
     loss_lst[a_idx] = loss_func(errs, rts)
+    logger.info(f"{args}: {loss_lst[a_idx]}")
 
 
 def param_to_arglist(params: OrderedDict, child_num: int):
@@ -142,16 +152,17 @@ def genetic_opt(run_func, param_space: OrderedDict, thread_init_args: Tuple, pro
         params[nm] = np.random.uniform(v_range[0], v_range[1], size=child_num)
 
     arg_list = param_to_arglist(params, child_num)
+    thread_num = (os.cpu_count() // 10) + 1
 
     for r_n in range(run_num):
 
-        with dummy.Pool(os.cpu_count(), init_opt, thread_init_args) as pool:
+        with dummy.Pool(thread_num, init_opt, thread_init_args) as pool:
             pool.starmap(run_func, opt_iter(arg_list, loss_lst, proc_init_args))
 
         # given minimum loss, save it and spawn more children
-        print(f"Best of batch: {base_args}\n")
         fittest_idx = int(np.argmin(loss_lst))
         base_args = arg_list[fittest_idx]
+        logger.info(f"Best of batch: {base_args}\n")
 
         # mutate offspring from fittest individual
         params = OrderedDict([(nm, []) for nm in param_space.keys()])
@@ -164,8 +175,6 @@ def genetic_opt(run_func, param_space: OrderedDict, thread_init_args: Tuple, pro
         arg_list = param_to_arglist(params, child_num)
 
         loss_lst = gen_manager.list([np.inf for _ in range(child_num)])
-
-    return True
 
 
 if __name__ == '__main__':
@@ -221,4 +230,4 @@ if __name__ == '__main__':
     initial_global_args = (fan_pair_vecs, all_time_slices, td_pause, td_each, f_strs)
     initial_proc_args = (inp, accum, D, t_range)
 
-    best = genetic_opt(opt_run_react, space, initial_global_args, initial_proc_args, 200, 8)
+    genetic_opt(opt_run_react, space, initial_global_args, initial_proc_args, 200, 8)
