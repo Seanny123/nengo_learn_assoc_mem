@@ -1,25 +1,21 @@
+"""Run and plot results of parameters found from optimisation."""
+
 import h5py
 import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 import nengo
 import nengo_spa as spa
 
 from nengo_learn_assoc_mem.utils import numpy_bytes_to_str, norm_spa_vecs
-from prototypes.rt_opt.opt_utils import decision, loss_func, f_in
+from prototypes.rt_opt.opt_utils import decision, f_in
 
 import multiprocessing
-from multiprocessing import dummy
 import os
-from collections import OrderedDict
-import logging
 
-from typing import List, Tuple
-
-logger = logging.getLogger('genetic_algo')
-logger.setLevel(logging.INFO)
-fh = logging.FileHandler('results.log')
-fh.setLevel(logging.INFO)
-logger.addHandler(fh)
+from typing import Tuple
 
 dt = 0.001  # monkey patch to just get things running
 
@@ -36,11 +32,6 @@ def sim_init(shared_inp, shared_accum_out, shared_dims, shared_t_range):
 
     global t_range
     t_range = shared_t_range
-
-
-def opt_iter(arg_lst, loss_lst, init_args):
-    for a_i, arg in enumerate(arg_lst):
-        yield a_i, arg, loss_lst, init_args
 
 
 def sim_iter(n_runs: int, p_vecs, res_lst):
@@ -69,13 +60,13 @@ def sim_net(run: int, p_vecs: np.ndarray, res_lst):
     res_lst.append(sim.data[p_clean_out].copy())
 
 
-def opt_run_react(a_idx: int, args, loss_lst: List, init_args: Tuple):
+def run_react(args, init_args: Tuple):
     print(args)
     thresh, fan1_noise_mag, fan2_noise_mag, fan1_reduce, fan2_reduce = args
 
     fan1_len = len(f_strs['fan1'])
 
-    p_vecs = pair_vecs.copy()
+    p_vecs = fan_pair_vecs.copy()
     p_vecs[fan1_len:] += np.random.normal(size=p_vecs[fan1_len:].shape) * fan1_noise_mag
     p_vecs[:fan1_len] += np.random.normal(size=p_vecs[:fan1_len].shape) * fan2_noise_mag
     p_vecs[fan1_len:] *= fan1_reduce
@@ -94,7 +85,7 @@ def opt_run_react(a_idx: int, args, loss_lst: List, init_args: Tuple):
         decs = []
         t_decs = []
 
-        for t_slice in time_slices:
+        for t_slice in all_time_slices:
             cl_slc = res[t_slice + td_pause:t_slice + td_each]
             tm, dec = decision(cl_slc, thresh=thresh, dec_thresh=1.0)
             decs.append(dec)
@@ -111,68 +102,7 @@ def opt_run_react(a_idx: int, args, loss_lst: List, init_args: Tuple):
             rts[lbl].append(np.mean(t_decs[comp_slc]))
             last_idx += len(lst)
 
-    loss_lst[a_idx] = loss_func(errs, rts)
-    logger.info(f"{args}: {loss_lst[a_idx]}")
-
-
-def param_to_arglist(params: OrderedDict, child_num: int):
-    arg_list = []
-    for c_n in range(child_num):
-        arg_list.append([p_vals[c_n] for p_vals in params.values()])
-
-    return arg_list
-
-
-def init_opt(shared_pair_vecs, shared_time_slices, shared_td_pause, shared_td_each, shared_f_strs):
-    global pair_vecs
-    pair_vecs = shared_pair_vecs
-
-    global time_slices
-    time_slices = shared_time_slices
-
-    global td_pause
-    td_pause = shared_td_pause
-
-    global td_each
-    td_each = shared_td_each
-
-    global f_strs
-    f_strs = shared_f_strs
-
-
-def genetic_opt(run_func, param_space: OrderedDict, thread_init_args: Tuple, proc_init_args, run_num: int, child_num=4):
-    gen_manager = multiprocessing.Manager()
-    loss_lst = gen_manager.list([np.inf for _ in range(child_num)])
-
-    # choose initial args
-    params = OrderedDict([(nm, []) for nm in param_space.keys()])
-    for nm, v_range in param_space.items():
-        params[nm] = np.random.uniform(v_range[0], v_range[1], size=child_num)
-
-    arg_list = param_to_arglist(params, child_num)
-    thread_num = (os.cpu_count() // 10) + 1
-
-    for r_n in range(run_num):
-
-        with dummy.Pool(thread_num, init_opt, thread_init_args) as pool:
-            pool.starmap(run_func, opt_iter(arg_list, loss_lst, proc_init_args))
-
-        # given minimum loss, save it and spawn more children
-        fittest_idx = int(np.argmin(loss_lst))
-        base_args = arg_list[fittest_idx]
-        logger.info(f"Best of batch: {base_args}\n")
-
-        # mutate offspring from fittest individual
-        params = OrderedDict([(nm, []) for nm in param_space.keys()])
-        for s_i, (nm, v_range) in enumerate(param_space.items()):
-            std = (v_range[1] - v_range[0]) / 2
-            noise = np.random.normal(0, std, size=child_num)
-            new_param = base_args[s_i] + noise
-            params[nm] = np.clip(new_param, v_range[0], v_range[1])
-
-        arg_list = param_to_arglist(params, child_num)
-
-        loss_lst = gen_manager.list([np.inf for _ in range(child_num)])
+    return errs, rts
 
 
 if __name__ == '__main__':
@@ -217,15 +147,22 @@ if __name__ == '__main__':
     fan_pair_vecs = np.array(fan1_pair_vecs + fan2_pair_vecs)
     f_strs = {"fan1": fan1, "fan2": fan2, "foil1": foil1, "foil2": foil2}
 
-    space = OrderedDict((
-        ('cls_thresh', (0.5, 1.2)),
-        ('f1_noise', (0.0, 0.2)),
-        ('f2_noise', (0.0, 0.2)),
-        ('f1_reduced', (0.8, 1.0)),
-        ('f2_reduced', (0.8, 1.0))
-    ))
-
-    initial_global_args = (fan_pair_vecs, all_time_slices, td_pause, td_each, f_strs)
+    params = [0.7811007509368267, 0.19625920377375358, 0.011436221080962653, 0.8966996121060862, 0.8760664213580347]
     initial_proc_args = (inp, accum, D, t_range)
+    err_res, rt_res = run_react(params, initial_proc_args)
 
-    genetic_opt(opt_run_react, space, initial_global_args, initial_proc_args, 200, 8)
+    err_lst = []
+    for nm, err in err_res.items():
+        err_lst.extend([(nm, ee) for ee in err])
+
+    err_df = pd.DataFrame(err_lst, columns=("trial", "err"))
+    sns.barplot(x="trial", y="err", data=err_df)
+    plt.show()
+
+    rt_lst = []
+    for nm, rt in rt_res.items():
+        rt_lst.extend([(nm, rr) for rr in rt])
+
+    rt_df = pd.DataFrame(rt_lst, columns=("trial", "rt"))
+    sns.barplot(x="trial", y="rt", data=rt_df)
+    plt.show()
