@@ -1,3 +1,6 @@
+"""Try to match the experimental reaction time by optimising the parameters with hyperopt
+with each trial in it's own process"""
+
 import h5py
 import numpy as np
 from hyperopt import hp
