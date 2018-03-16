@@ -35,6 +35,8 @@ td_pause = t_pause/dt
 intercept = 0.2
 intercepts = [intercept]*n_neurons
 
+neg_voja_lr = 5e-6 / n_repeats
+
 # generate encoders to be used in Negative Voja
 
 with nengo.Network() as model:
@@ -53,7 +55,7 @@ with nengo.Network() as model:
     in_nd = nengo.Node(feed.feed)
     paused = nengo.Node(lambda t: 1-feed.paused)
 
-    neg_voja = NegVoja(enc.copy(), learning_rate=(5e-6 / n_repeats))
+    neg_voja = NegVoja(enc.copy(), learning_rate=neg_voja_lr)
     ens = nengo.Ensemble(n_neurons, dimensions, intercepts=intercepts, seed=seed)
 
     nengo.Connection(in_nd, neg_voja.input_signal, synapse=None)
@@ -127,6 +129,7 @@ with h5py.File("data/neg_voja_enc.h5", "w") as fi:
     enc = fi.create_dataset("encoders", data=fin_enc)
     enc.attrs["seed"] = seed
     enc.attrs["intercept"] = intercept
+    enc.attrs["learning_rate"] = neg_voja_lr
 
     pnt_nms = []
     pnt_vectors = []
