@@ -41,7 +41,7 @@ def train_net(feed_vecs, n_repeats: int, t_pres: float, t_paus: float,
 
     w_hist = np.array(rec_learn.weight_history)
 
-    with h5py.File(f"../data/neg_voja_rec_learn/{save_file}.h5", "w") as sv_fi:
+    with h5py.File(f"data/neg_voja_rec_learn/{save_file}.h5", "w") as sv_fi:
         sv_fi.create_dataset("train_input", data=np.array(sim.data[p_in]))
 
         sv_fi.create_dataset("train_spikes", data=np.array(sim.data[p_spikes]))
@@ -83,11 +83,11 @@ def net_response(feed_vecs, t_pres: float, t_paus: float, rec_weights: np.ndarra
     with nengo.Simulator(learned_model) as learned_sim:
         learned_sim.run(len(feed_vecs) * t_each + t_pause)
 
-    with h5py.File(f"../data/neg_voja_rec_learn/{save_file}.h5", "a") as sv_fi:
+    with h5py.File(f"data/neg_voja_rec_learn/{save_file}.h5", "a") as sv_fi:
         sv_fi.create_dataset("spike_response", data=np.array(learned_sim.data[p_spikes]))
 
 
-with h5py.File("../data/neg_voja_enc.h5", "r") as fi:
+with h5py.File("data/neg_voja_enc.h5", "r") as fi:
     print(list(fi.keys()))
 
     fan1 = numpy_bytes_to_str(fi['fan1'])
@@ -115,7 +115,7 @@ fan2_pair_vecs = norm_spa_vecs(vocab, fan2)
 foil1_pair_vecs = norm_spa_vecs(vocab, foil1)
 foil2_pair_vecs = norm_spa_vecs(vocab, foil2)
 
-save_file_name = "more_repeats"
+save_file_name = "more_repeats_again"
 
 t_pause = 0.1
 t_present = 0.3
