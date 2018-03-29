@@ -11,12 +11,12 @@ from nengo_learn_assoc_mem.learning_rules import rec_bcm
 
 
 def train_net(feed_vecs, n_repeats: int, t_pres: float, t_paus: float,
-              base_inhib: float, bcm_lr: float, bcm_thresh: float, sample_freq,
+              base_inhib: float, bcm_lr: float, bcm_thresh: float, sample_freq: float,
               save_file: str):
     t_each = t_pres + t_paus
     rec_inhib = base_inhib * (np.ones(n_neurons) - np.eye(n_neurons))
 
-    feed = BasicVecFeed(feed_vecs, feed_vecs, t_present, dimensions, len(feed_vecs), t_pause)
+    feed = BasicVecFeed(feed_vecs, feed_vecs, t_pres, dimensions, len(feed_vecs), t_paus)
 
     with nengo.Network() as model:
         in_nd = nengo.Node(feed.feed)
@@ -37,7 +37,7 @@ def train_net(feed_vecs, n_repeats: int, t_pres: float, t_paus: float,
         p_spikes = nengo.Probe(ens.neurons)
 
     with nengo.Simulator(model) as sim:
-        sim.run(n_repeats * len(feed_vecs) * t_each + t_pause)
+        sim.run(n_repeats * len(feed_vecs) * t_each + t_paus)
 
     w_hist = np.array(rec_learn.weight_history)
 
@@ -55,8 +55,8 @@ def train_net(feed_vecs, n_repeats: int, t_pres: float, t_paus: float,
         bcm.attrs["repeats"] = n_repeats
         bcm.attrs["sample_freq"] = sample_freq
 
-        bcm.attrs["t_pause"] = t_pause
-        bcm.attrs["t_present"] = t_present
+        bcm.attrs["t_pause"] = t_paus
+        bcm.attrs["t_present"] = t_pres
 
         bcm.attrs["base_inhib"] = base_inhib
         bcm.attrs["thresh"] = bcm_thresh
@@ -67,7 +67,7 @@ def train_net(feed_vecs, n_repeats: int, t_pres: float, t_paus: float,
 
 def net_response(feed_vecs, t_pres: float, t_paus: float, rec_weights: np.ndarray, save_file: str):
     t_each = t_pres + t_paus
-    feed = BasicVecFeed(feed_vecs, feed_vecs, t_present, dimensions, len(feed_vecs), t_pause)
+    feed = BasicVecFeed(feed_vecs, feed_vecs, t_pres, dimensions, len(feed_vecs), t_paus)
 
     with nengo.Network() as learned_model:
         in_nd = nengo.Node(feed.feed)
@@ -81,7 +81,7 @@ def net_response(feed_vecs, t_pres: float, t_paus: float, rec_weights: np.ndarra
         p_spikes = nengo.Probe(ens.neurons)
 
     with nengo.Simulator(learned_model) as learned_sim:
-        learned_sim.run(len(feed_vecs) * t_each + t_pause)
+        learned_sim.run(len(feed_vecs) * t_each + t_paus)
 
     with h5py.File(f"data/neg_voja_rec_learn/{save_file}.h5", "a") as sv_fi:
         sv_fi.create_dataset("spike_response", data=np.array(learned_sim.data[p_spikes]))
@@ -115,22 +115,22 @@ fan2_pair_vecs = norm_spa_vecs(vocab, fan2)
 foil1_pair_vecs = norm_spa_vecs(vocab, foil1)
 foil2_pair_vecs = norm_spa_vecs(vocab, foil2)
 
-save_file_name = "more_repeats_again"
+save_file_name = "higher_thresh_again"
 
-t_pause = 0.1
-t_present = 0.3
+tm_pause = 0.1
+tm_present = 0.3
 
-presentation_repeats = 6
+presentation_repeats = 2
 weight_sample_freq = 10
 
 base_rec_inhib = -2e-3
-bcm_lr_thresh = 10
+bcm_lr_thresh = 50
 bcm_lr_rate = 1e-6
 
 input_feed_vecs = fan1_pair_vecs + fan2_pair_vecs
-rec_w = train_net(input_feed_vecs, presentation_repeats, t_present, t_pause,
+rec_w = train_net(input_feed_vecs, presentation_repeats, tm_present, tm_pause,
                   base_rec_inhib, bcm_lr_thresh, bcm_lr_rate, weight_sample_freq,
                   save_file_name)
 
 input_feed_vecs = fan1_pair_vecs + fan2_pair_vecs + foil1_pair_vecs + foil2_pair_vecs
-net_response(input_feed_vecs, t_present, t_pause, rec_w, save_file_name)
+net_response(input_feed_vecs, tm_present, tm_pause, rec_w, save_file_name)
