@@ -1,4 +1,6 @@
-"""Modify the IA module to respond more to certain vectors"""
+"""Modify the IA module to respond more to certain vectors by changing the number of neurons
+assigned to each vector-population. It requires sub-classing
+of a lot of different existing classes, because it modifies an essential attribute."""
 import numpy as np
 
 import nengo_spa as spa
