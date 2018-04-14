@@ -277,3 +277,17 @@ class VecToScalarFeed(BasicVecFeed):
             return self.correct[self.indices[self.data_index]]
         else:
             return 0
+
+
+class LearnDelayVecFeed(BasicVecFeed):
+
+    def __init__(self, dataset: Sequence, correct: Sequence, t_len: float, dims: int, n_items: int,
+                 pause: float, t_delay: float):
+        self.t_delay = t_delay
+        super(LearnDelayVecFeed, self).__init__(dataset, correct, t_len, dims, n_items, pause)
+
+    def get_learn(self, t):
+        if self.pause_time + self.t_delay < self.time < self.ans_duration:
+            return 1
+        else:
+            return 0
