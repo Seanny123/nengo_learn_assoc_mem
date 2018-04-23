@@ -2,6 +2,7 @@
 from collections import namedtuple
 import itertools
 import os
+from typing import Dict
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -43,18 +44,17 @@ t_each = t_pause + t_present
 td_pause = t_pause / dt
 
 
-def get_encoders(cepts: np.ndarray, n_voja_lr: float, sim_len: float) -> np.ndarray:
-
-    # generate encoders to be used in Negative Voja
+def get_encoders(cepts: np.ndarray) -> np.ndarray:
     with nengolib.Network(seed=seed) as model:
         ens = nengo.Ensemble(n_neurons, dimensions, intercepts=cepts, seed=seed)
 
     with nengo.Simulator(model) as sim:
         pass
 
-    enc = sim.data[ens].encoders.copy()
+    return sim.data[ens].encoders.copy()
 
-    # learn encoders
+
+def train_encoders(enc: np.ndarray, cepts: np.ndarray, n_voja_lr: float, sim_len: float) -> np.ndarray:
     feed = BasicVecFeed(feed_vecs, feed_vecs, t_present, dimensions, len(feed_vecs), t_pause)
 
     with nengolib.Network(seed=seed) as model:
@@ -73,10 +73,11 @@ def get_encoders(cepts: np.ndarray, n_voja_lr: float, sim_len: float) -> np.ndar
     with nengo.Simulator(model) as sim:
         sim.run(sim_len)
 
-    return neg_voja.encoder_hist[-1].copy()
+    return neg_voja.encoder_hist
 
 
-def test_response(fin_enc: np.ndarray, save_file: str, sim_len: float, plt_res=False):
+def test_response(encs: np.ndarray, save_file: str, enc_args: Dict, plt_res=False):
+    fin_enc = encs[-1].copy()
     # verify result with plots
     with nengo.Network() as model:
         ens = nengo.Ensemble(n_neurons, dimensions, encoders=fin_enc, intercepts=intercepts, seed=seed)
@@ -116,18 +117,18 @@ def test_response(fin_enc: np.ndarray, save_file: str, sim_len: float, plt_res=F
             t.set_text(l)
         plt.show()
 
-    # save the resulting weights and vocab
-
-    with h5py.File(os.path.join(data_path, save_file), "w") as fi:
-        tm = fi.create_dataset("t_range", data=[0, sim_len])
+    # save the resulting activities, weights and vocab
+    save_path = os.path.join(data_path, save_file)
+    with h5py.File(save_path, "w") as fi:
+        tm = fi.create_dataset("t_range", data=[0, enc_args["t_sim"]])
         tm.attrs["dt"] = float(sim.dt)
         tm.attrs["t_pause"] = t_pause
         tm.attrs["t_present"] = t_present
 
-        enc = fi.create_dataset("encoders", data=fin_enc)
+        enc = fi.create_dataset("encoders", data=encs)
         enc.attrs["seed"] = seed
-        enc.attrs["intercept"] = intercept
-        enc.attrs["learning_rate"] = neg_voja_lr
+        enc.attrs["intercept"] = enc_args["intercept"]
+        enc.attrs["learning_rate"] = enc_args["learning_rate"]
 
         pnt_nms = []
         pnt_vectors = []
@@ -143,15 +144,19 @@ def test_response(fin_enc: np.ndarray, save_file: str, sim_len: float, plt_res=F
             added_str = gen_added_strings(pairs)
             fi.create_dataset(nm, data=list_as_ascii(added_str))
 
+    act_df.to_hdf(save_path, "response", mode="r+", format="fixed")
 
-intercept_vals = (0.1, 0.2, 0.3)
-lr_vals = (1e-6, 5e-6, 1e-7)
-repeat_vals = (4, 5, 6)
 
-for n_repeats, intercept, lr in itertools.product(intercept_vals, lr_vals, repeat_vals):
+intercept_vals = (0.15,)
+lr_vals = (9e-6, 8e-6,)
+repeat_vals = (4,)
+
+for intercept, lr, n_repeats in itertools.product(intercept_vals, lr_vals, repeat_vals):
     intercepts = np.ones(n_neurons) * intercept
     neg_voja_lr = lr / n_repeats
     t_sim = n_repeats * len(feed_vecs) * t_each + t_pause
 
-    learned_enc = get_encoders(intercepts, neg_voja_lr, t_sim)
-    test_response(learned_enc, f"neg_voja_enc_{n_repeats}_{intercept}_{lr}.h5", t_sim)
+    start_encs = get_encoders(intercepts)
+    learned_encs = train_encoders(start_encs, intercepts, neg_voja_lr, t_sim)
+    learning_args = {"intercept": intercept, "learning_rate": neg_voja_lr, "t_sim": t_sim}
+    test_response(learned_encs, f"neg_voja_enc_{n_repeats}_{intercept}_{lr}.h5", learning_args)
