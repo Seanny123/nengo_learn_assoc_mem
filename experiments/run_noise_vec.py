@@ -1,4 +1,5 @@
 import string
+import os
 from typing import List, Dict
 
 import nengo
@@ -7,10 +8,10 @@ import nengolib
 import nengo_spa as spa
 
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+import pandas as pd
 
-from nengo_learn_assoc_mem.utils import BasicVecFeed
+from nengo_learn_assoc_mem.utils import BasicVecFeed, conf_metric
+from nengo_learn_assoc_mem.paths import data_path
 
 seed = 8
 D = 8
@@ -22,31 +23,11 @@ rng = np.random.RandomState(seed)
 vocab = spa.Vocabulary(D, max_similarity=0.35, rng=rng)
 vocab.populate(";".join([string.ascii_uppercase[i] for i in range(n_items)]))
 
-dt = 0.001
 t_present = 0.3
-t_pause = 0.0
-n_repeats = 5
-t_each = t_present + t_pause
-
-
-def conf_metric(ss_data: np.ndarray) -> Dict:
-    correct = False
-
-    smoothed = np.mean(ss_data, axis=0)
-    winner = np.argmax(smoothed)
-    mask = np.ones(n_items, dtype=bool)
-    mask[winner] = False
-    runnerup = np.argmax(smoothed[mask])
-    runnerup_dist = smoothed[winner] - smoothed[runnerup]
-
-    if runnerup_dist > 0:
-        correct = True
-
-    return dict(correct=correct, top_mag=smoothed[winner], runnerup_dist=runnerup_dist)
 
 
 def train_mem(vecs: List[np.ndarray], voja_learn_rate=1e-5, pes_learn_rate=1e-3):
-    feed = BasicVecFeed(vecs, vecs, t_present, D, len(vecs), t_pause)
+    feed = BasicVecFeed(vecs, vecs, t_present, D, len(vecs), 0.)
 
     with nengolib.Network(seed=seed) as train_model:
         in_nd = nengo.Node(feed.feed)
@@ -85,7 +66,7 @@ def train_mem(vecs: List[np.ndarray], voja_learn_rate=1e-5, pes_learn_rate=1e-3)
         p_out = nengo.Probe(output, synapse=0.01)
 
     with nengo.Simulator(train_model) as train_sim:
-        train_sim.run(n_repeats * len(vecs) * t_each + t_pause)
+        train_sim.run(5 * len(vecs) * t_present)
 
     enc = train_sim.data[p_enc][-1]
     dec = train_sim.data[p_dec][-1]
@@ -96,7 +77,7 @@ def train_mem(vecs: List[np.ndarray], voja_learn_rate=1e-5, pes_learn_rate=1e-3)
 def test_mem(enc: np.ndarray, dec: np.ndarray, in_vec: List[np.ndarray],
              noise_mag: float, noise_synapse=None,
              rec_w=None, rec_synapse=0.01) -> np.ndarray:
-    feed = BasicVecFeed(in_vec, in_vec, t_present, D, len(in_vec), t_pause)
+    feed = BasicVecFeed(in_vec, in_vec, t_present, D, len(in_vec), 0.)
 
     with nengolib.Network(seed=seed) as test_model:
         vec_nd = nengo.Node(feed.feed)
@@ -125,7 +106,7 @@ def test_mem(enc: np.ndarray, dec: np.ndarray, in_vec: List[np.ndarray],
         p_out = nengo.Probe(output, synapse=0.01)
 
     with nengo.Simulator(test_model) as test_sim:
-        test_sim.run(n_repeats * t_each + t_pause)
+        test_sim.run(t_present)
 
     return test_sim.data[p_out]
 
@@ -161,20 +142,46 @@ def rec_bcm(vecs: np.ndarray, enc: np.ndarray, base_inhib=-1e-4, max_excite=1e-3
 encoders, decoders = train_mem(list(vocab.vectors))
 rec_weights = rec_bcm(vocab.vectors, encoders)
 
-test_vec = [vocab['J'].v * 0.8]
+df_cols = ("cor", "mag", "rn_dist", "noise_mag", "rec_w", "rec_syn", "letter")
+all_res = []
 
-# TODO: Run multiple iterations
-# TODO: Save results somehow
-# TODO: Plot the confidence interval as a function of approaches
-for noise_magnitude in (0.0, 0.1, 0.2):
+test_cases = {
+    "base": (None, 0.),
+    "low": (rec_weights, 0.001),
+    "mid": (rec_weights, 0.005),
+    "high": (rec_weights, 0.01),
+    "very_high": (rec_weights, 0.05)
+}
 
-    base_res = test_mem(encoders, decoders, test_vec, noise_magnitude)
-    low_syn_res = test_mem(encoders, decoders, test_vec, noise_magnitude,
-                           rec_w=rec_weights, rec_synapse=0.001)
-    rec_res = test_mem(encoders, decoders, test_vec, noise_magnitude,
-                       rec_w=rec_weights, rec_synapse=0.005)
-    high_syn_res = test_mem(encoders, decoders, test_vec, noise_magnitude,
-                            rec_w=rec_weights, rec_synapse=0.01)
+for nm, (rec_weights, rec_syn) in test_cases.items():
 
-    base_conf = conf_metric(spa.similarity(base_res, vocab))
-    rec_conf = conf_metric(spa.similarity(rec_res, vocab))
+    print(nm)
+
+    if rec_weights is None:
+        save_weights = False
+    else:
+        save_weights = True
+
+    for repeats in range(10):
+        for l_i in range(10):
+            letter = string.ascii_uppercase[l_i]
+            test_vec = [vocab[letter].v * 0.8]
+
+            for noise_magnitude in (0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3):
+
+                res = test_mem(encoders, decoders, test_vec, noise_magnitude,
+                               rec_w=rec_weights, rec_synapse=rec_syn)
+                conf = conf_metric(spa.similarity(res, vocab), l_i)
+
+                all_res.append((conf["correct"],
+                                conf["top_mag"],
+                                conf["runnerup_dist"],
+                                noise_magnitude,
+                                save_weights,
+                                rec_syn,
+                                letter))
+
+all_df = pd.DataFrame(all_res, columns=df_cols)
+all_df.to_hdf(
+    os.path.join(data_path, "neg_voja_rec_test", "test_all.h5"),
+    "conf", mode="w")

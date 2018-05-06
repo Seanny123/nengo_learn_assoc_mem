@@ -5,7 +5,7 @@ import numpy as np
 from random import shuffle
 import itertools
 
-from typing import Sequence, List, Tuple
+from typing import Sequence, List, Tuple, Dict
 
 dt = 0.001
 
@@ -26,12 +26,6 @@ def choose_encoders(n_neurons: int, dimensions: int, encoder_proportion: float, 
 
 def numpy_bytes_to_str(lst):
     return [l.decode('utf-8') for l in lst]
-
-
-def scale_array(x, out_range=(-1, 1), axis=None):
-    domain = np.min(x, axis), np.max(x, axis)
-    y = (x - (domain[1] + domain[0]) / 2) / (domain[1] - domain[0])
-    return y * (out_range[1] - out_range[0]) + (out_range[1] + out_range[0]) / 2
 
 
 def list_as_ascii(li: List[str]):
@@ -110,7 +104,8 @@ def vecs_from_list(vocab: spa.Vocabulary, spa_strs: List[Tuple[str, str]], norm=
     return res
 
 
-def check_fan_foil(fan, foil):
+def check_fan_foil(fan: List[Tuple[str, str]], foil: List[Tuple[str, str]]):
+    """Verify no pairs found in the fans are found in the foils"""
     foil_items = set()
 
     for i1, i2 in foil:
@@ -126,8 +121,21 @@ def check_fan_foil(fan, foil):
     assert len(foil_items - fan_items) == 0
 
 
-def make_alt_vocab(n_fan1_items: int, n_fan2_items: int, dimensions: int, seed, norm=False):
+def gen_vocab(dimensions: int, pairs, seed: float) -> spa.Vocabulary:
     rng = np.random.RandomState(seed=seed)
+    vocab = spa.Vocabulary(dimensions, max_similarity=0.9, rng=rng)
+
+    items = set()
+    for i1, i2 in pairs:
+        items.add(i1)
+        items.add(i2)
+    for item in items:
+        vocab.populate(item)
+
+    return vocab
+
+
+def make_alt_vocab(n_fan1_items: int, n_fan2_items: int, dimensions: int, seed: float, norm=False):
 
     fan1, foil1 = gen_fan1_pairs(n_fan1_items)
     check_fan_foil(fan1, foil1)
@@ -136,13 +144,7 @@ def make_alt_vocab(n_fan1_items: int, n_fan2_items: int, dimensions: int, seed, 
 
     pairs = fan1 + fan2
 
-    vocab = spa.Vocabulary(dimensions, max_similarity=0.9, rng=rng)
-    items = set()
-    for i1, i2 in pairs:
-        items.add(i1)
-        items.add(i2)
-    for item in items:
-        vocab.populate(item)
+    vocab = gen_vocab(dimensions, pairs, seed)
 
     fan1_vecs = vecs_from_list(vocab, fan1, norm)
     foil1_vecs = vecs_from_list(vocab, foil1, norm)
@@ -152,12 +154,12 @@ def make_alt_vocab(n_fan1_items: int, n_fan2_items: int, dimensions: int, seed, 
     return vocab, fan1, fan1_vecs, fan2, fan2_vecs, foil1, foil1_vecs, foil2, foil2_vecs
 
 
-def spa_parse_norm(vocab: spa.Vocabulary, spa_str: str):
+def spa_parse_norm(vocab: spa.Vocabulary, spa_str: str) -> np.ndarray:
     big_vec = vocab.parse(spa_str).v
     return big_vec / np.linalg.norm(big_vec)
 
 
-def norm_spa_vecs(vocab: spa.Vocabulary, spa_strs: List[str]):
+def norm_spa_vecs(vocab: spa.Vocabulary, spa_strs: List[str]) -> List[np.ndarray]:
     res = []
 
     for spa_str in spa_strs:
@@ -167,23 +169,30 @@ def norm_spa_vecs(vocab: spa.Vocabulary, spa_strs: List[str]):
     return res
 
 
-def make_fan_vocab(seed, dimensions: int):
-    rng = np.random.RandomState(seed=seed)
-    vocab = spa.Vocabulary(dimensions, rng=rng, strict=False)
-
-    fan1 = ["CAT+DOG", "DUCK+FISH", "HORSE+COW"]
-    fan1_vecs = norm_spa_vecs(vocab, fan1)
-    fan1_labels = ["F1%s" % i for i in range(len(fan1))]
-
-    fan2 = ["PIG+RAT", "PIG+GOAT", "SHEEP+EMU", "SHEEP+GOOSE", "FROG+TOAD", "FROG+NEWT"]
-    fan2_vecs = norm_spa_vecs(vocab, fan2)
-    fan2_labels = ["F2%s" % i for i in range(len(fan1))]
-
-    return vocab, fan1, fan1_vecs, fan1_labels, fan2, fan2_vecs, fan2_labels
-
-
 def meg_from_spikes(spikes: np.ndarray, meg_syn=0.1):
     return nengo.Lowpass(meg_syn).filt(np.sum(spikes, axis=1))
+
+
+def conf_metric(ss_data: np.ndarray, expected: int) -> Dict:
+    correct = False
+
+    smoothed = np.mean(ss_data, axis=0)
+    winner = np.argmax(smoothed)
+    mask = np.ones(smoothed.shape[0], dtype=bool)
+    mask[winner] = False
+    runnerup = np.argmax(smoothed[mask])
+    runnerup_dist = smoothed[winner] - smoothed[runnerup]
+
+    if winner == expected:
+        correct = True
+
+    return dict(correct=correct, top_mag=smoothed[winner], runnerup_dist=runnerup_dist)
+
+
+def ans_conf(ans: np.ndarray, cor: np.ndarray, num_items: int, td_item: int) -> np.ndarray:
+    individ_ans_conf = np.sum(ans*cor, axis=1).reshape((td_item, num_items, -1), order='F')
+    conf = np.max(np.sum(individ_ans_conf, axis=0), axis=1)
+    return conf
 
 
 def cycle_array(x, period, dt=0.001):
