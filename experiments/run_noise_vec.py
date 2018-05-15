@@ -1,6 +1,6 @@
 import string
 import os
-from typing import List, Dict
+from typing import List
 
 import nengo
 from nengo.utils.ensemble import tuning_curves
