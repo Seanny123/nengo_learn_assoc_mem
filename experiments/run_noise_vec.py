@@ -3,14 +3,14 @@ import os
 from typing import List
 
 import nengo
-from nengo.utils.ensemble import tuning_curves
 import nengolib
 import nengo_spa as spa
 
 import numpy as np
 import pandas as pd
 
-from nengo_learn_assoc_mem.utils import BasicVecFeed, conf_metric
+from nengo_learn_assoc_mem.learning_rules.rec_bcm import pos_rec_bcm
+from nengo_learn_assoc_mem.utils import BasicVecFeed, conf_metric, get_activites
 from nengo_learn_assoc_mem.paths import data_path
 
 seed = 8
@@ -111,36 +111,9 @@ def test_mem(enc: np.ndarray, dec: np.ndarray, in_vec: List[np.ndarray],
     return test_sim.data[p_out]
 
 
-def rec_bcm(vecs: np.ndarray, enc: np.ndarray, base_inhib=-1e-4, max_excite=1e-3) -> np.ndarray:
-    with nengolib.Network(seed=seed) as model:
-        ens = nengo.Ensemble(n_neurons, D, encoders=enc, intercepts=intercepts)
-
-    with nengo.Simulator(model) as sim:
-        pass
-
-    _, activities = tuning_curves(ens, sim, inputs=vecs)
-
-    act_corr = np.zeros((n_neurons, n_neurons), dtype=np.float)
-
-    for item in range(n_items):
-        act_corr += np.outer(activities[item], activities[item])
-    np.fill_diagonal(act_corr, 0)
-
-    pos_corr = act_corr[act_corr > 0.]
-    min_pos_corr = np.min(pos_corr)
-
-    max_corr = np.max(act_corr)
-
-    rec_w = np.zeros((n_neurons, n_neurons), dtype=np.float)
-    rec_w[act_corr > 0.] = np.interp(pos_corr,
-                                     (min_pos_corr, max_corr),
-                                     (base_inhib, max_excite))
-
-    return rec_w
-
-
 encoders, decoders = train_mem(list(vocab.vectors))
-rec_weights = rec_bcm(vocab.vectors, encoders)
+activities = get_activites(vocab.vectors, n_neurons, D, encoders, intercepts, seed)
+rec_weights = pos_rec_bcm(activities)
 
 df_cols = ("cor", "mag", "rn_dist", "noise_mag", "rec_w", "rec_syn", "letter")
 all_res = []

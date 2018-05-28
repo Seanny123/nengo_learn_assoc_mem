@@ -53,3 +53,55 @@ class RecBCM(nengo.Network):
             self.weight_history.append(self.weights.copy())
 
         return np.dot(self.weights, self.in_rates)
+
+
+def pos_rec_bcm(activities: np.ndarray, base_inhib=-1e-4, max_excite=1e-3) -> np.ndarray:
+    n_neurons = activities.shape[0]
+    n_items = activities.shape[1]
+
+    act_corr = np.zeros((n_neurons, n_neurons), dtype=np.float)
+
+    for item in range(n_items):
+        act_corr += np.outer(activities[item], activities[item])
+    np.fill_diagonal(act_corr, 0)
+
+    pos_corr = act_corr[act_corr > 0.]
+    min_pos_corr = np.min(pos_corr)
+
+    max_corr = np.max(act_corr)
+
+    rec_w = np.zeros((n_neurons, n_neurons), dtype=np.float)
+    rec_w[act_corr > 0.] = np.interp(pos_corr,
+                                     (min_pos_corr, max_corr),
+                                     (base_inhib, max_excite))
+
+    return rec_w
+
+
+def mean_rec_bcm(activities: np.ndarray,
+                 base_inhib=-1e-4, max_excite=1e-3, max_inhib=-1e-3) -> np.ndarray:
+    n_neurons = activities.shape[0]
+    n_items = activities.shape[1]
+
+    act_corr = np.zeros((n_neurons, n_neurons), dtype=np.float)
+    mean_act = activities - np.mean(activities, axis=0)
+
+    for item in range(n_items):
+        act_corr += np.outer(mean_act[item], mean_act[item])
+    np.fill_diagonal(act_corr, 0)
+
+    max_corr = np.max(act_corr)
+    min_corr = np.min(act_corr)
+
+    pos_corr = act_corr[act_corr > 0.]
+    min_pos_corr = np.min(pos_corr)
+
+    neg_corr = act_corr[act_corr < 0.]
+    max_neg_corr = np.max(neg_corr)
+
+    rec_w = np.ones((n_neurons, n_neurons), dtype=np.float) * base_inhib
+    rec_w[act_corr > 0.] = np.interp(pos_corr, (min_pos_corr, max_corr), (base_inhib, max_excite))
+    rec_w[act_corr < 0.] = np.interp(neg_corr, (min_corr, max_neg_corr), (max_inhib, base_inhib))
+    np.fill_diagonal(rec_w, 0)
+
+    return rec_w

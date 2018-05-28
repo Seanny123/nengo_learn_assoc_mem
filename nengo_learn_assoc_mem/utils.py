@@ -1,4 +1,6 @@
 import nengo
+import nengolib
+from nengo.utils.ensemble import tuning_curves
 import nengo_spa as spa
 import numpy as np
 
@@ -8,6 +10,19 @@ import itertools
 from typing import Sequence, List, Tuple, Dict
 
 dt = 0.001
+
+
+def get_activites(vecs: np.ndarray, n_neurons: int, dimensions: int,
+                  enc: np.ndarray, intercepts: np.ndarray, seed: int):
+    with nengolib.Network(seed=seed) as model:
+        ens = nengo.Ensemble(n_neurons, dimensions, encoders=enc, intercepts=intercepts)
+
+    with nengo.Simulator(model) as sim:
+        pass
+
+    _, activities = tuning_curves(ens, sim, inputs=vecs)
+
+    return activities
 
 
 def choose_encoders(n_neurons: int, dimensions: int, encoder_proportion: float, mean_fan1, mean_fan2):
