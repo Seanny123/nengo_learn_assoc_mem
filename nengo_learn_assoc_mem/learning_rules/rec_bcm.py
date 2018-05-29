@@ -56,8 +56,8 @@ class RecBCM(nengo.Network):
 
 
 def pos_rec_bcm(activities: np.ndarray, base_inhib=-1e-4, max_excite=1e-3) -> np.ndarray:
-    n_neurons = activities.shape[0]
-    n_items = activities.shape[1]
+    n_items = activities.shape[0]
+    n_neurons = activities.shape[1]
 
     act_corr = np.zeros((n_neurons, n_neurons), dtype=np.float)
 
@@ -74,14 +74,15 @@ def pos_rec_bcm(activities: np.ndarray, base_inhib=-1e-4, max_excite=1e-3) -> np
     rec_w[act_corr > 0.] = np.interp(pos_corr,
                                      (min_pos_corr, max_corr),
                                      (base_inhib, max_excite))
+    np.fill_diagonal(rec_w, 0)
 
     return rec_w
 
 
 def mean_rec_bcm(activities: np.ndarray,
                  base_inhib=-1e-4, max_excite=1e-3, max_inhib=-1e-3) -> np.ndarray:
-    n_neurons = activities.shape[0]
-    n_items = activities.shape[1]
+    n_items = activities.shape[0]
+    n_neurons = activities.shape[1]
 
     act_corr = np.zeros((n_neurons, n_neurons), dtype=np.float)
     mean_act = activities - np.mean(activities, axis=0)
