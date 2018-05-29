@@ -12,8 +12,8 @@ from typing import Sequence, List, Tuple, Dict
 dt = 0.001
 
 
-def get_activites(vecs: np.ndarray, n_neurons: int, dimensions: int,
-                  enc: np.ndarray, intercepts: np.ndarray, seed: int):
+def get_activities(vecs: np.ndarray, n_neurons: int, dimensions: int,
+                   enc: np.ndarray, intercepts: np.ndarray, seed: int):
     with nengolib.Network(seed=seed) as model:
         ens = nengo.Ensemble(n_neurons, dimensions, encoders=enc, intercepts=intercepts)
 
@@ -193,10 +193,11 @@ def conf_metric(ss_data: np.ndarray, expected: int) -> Dict:
 
     smoothed = np.mean(ss_data, axis=0)
     winner = np.argmax(smoothed)
+    winner_mag = smoothed[winner]
     mask = np.ones(smoothed.shape[0], dtype=bool)
     mask[winner] = False
     runnerup = np.argmax(smoothed[mask])
-    runnerup_dist = smoothed[winner] - smoothed[runnerup]
+    runnerup_dist = (smoothed[winner] - smoothed[mask][runnerup]) / winner_mag
 
     if winner == expected:
         correct = True
