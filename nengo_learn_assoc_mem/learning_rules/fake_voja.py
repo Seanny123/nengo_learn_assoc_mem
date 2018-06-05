@@ -37,7 +37,7 @@ class FakeVoja(nengo.Network):
         self.enabled = x
 
     def encode(self, t):
-        self.encoders += self.enabled * self.learning_rate * self.acts[:, None] * (self.encoders - self.in_sig)
+        self.encoders += self.enabled * self.learning_rate * self.acts[:, None] * (self.in_sig - self.encoders)
 
         if (t / self.dt % self.period) < 1:
             self.encoder_hist.append(self.encoders.copy())
