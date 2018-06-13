@@ -9,7 +9,7 @@ import nengo_spa as spa
 import numpy as np
 import pandas as pd
 
-from nengo_learn_assoc_mem.learning_rules.rec_bcm import pos_rec_bcm
+from nengo_learn_assoc_mem.learning_rules.rec_bcm import mean_rec_bcm
 from nengo_learn_assoc_mem.utils import BasicVecFeed, conf_metric, get_activities
 from nengo_learn_assoc_mem.paths import data_path
 
@@ -122,7 +122,7 @@ def test_mem(enc: np.ndarray, dec: np.ndarray, in_vec: List[np.ndarray],
 
 encoders, decoders = train_mem(list(vocab.vectors))
 activities = get_activities(vocab.vectors, n_neurons, D, encoders, intercepts, seed)
-rec_weights = pos_rec_bcm(activities)
+rec_weights = mean_rec_bcm(activities)
 
 df_cols = ("cor", "mag", "rn_dist", "noise_mag", "dead_num", "rec_w", "rec_syn", "letter")
 all_res = []
@@ -170,5 +170,5 @@ for nm, (rec_weights, rec_syn) in test_cases.items():
 
 all_df = pd.DataFrame(all_res, columns=df_cols)
 all_df.to_hdf(
-    os.path.join(data_path, "neg_voja_rec_test", "more_ablate.h5"),
+    os.path.join(data_path, "neg_voja_rec_test", "norm_ablate.h5"),
     "conf", mode="w")
