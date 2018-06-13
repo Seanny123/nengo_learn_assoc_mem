@@ -5,7 +5,7 @@ from nengo_learn_assoc_mem.learning_rules.fake_voja import FakeVoja
 
 class NegVoja(FakeVoja):
 
-    def __init__(self, encoders: np.ndarray, post_tau=0.005, learning_rate=1e-3, radius=1.0):
+    def __init__(self, encoders: np.ndarray, post_tau=0.005, learning_rate=1e-3, radius=1.):
         super().__init__(encoders, post_tau, learning_rate)
         self.radius = radius
 
