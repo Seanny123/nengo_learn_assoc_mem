@@ -59,8 +59,9 @@ with spa.Network() as model:
 with nengo.Simulator(model) as sim:
     sim.run(1.1)
 
-plt.plot(sim.data[p_out])
-plt.plot(sim.data[p_comp])
+plt.plot(sim.data[p_out], label="neural comp")
+plt.plot(sim.data[p_comp], label="node comp")
+plt.legend()
 plt.show()
 
 conf = ans_conf(sim.data[p_in][:900], sim.data[p_cor][:900], 3, td_item)
