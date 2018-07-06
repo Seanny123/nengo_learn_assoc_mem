@@ -2,21 +2,29 @@ import numpy as np
 
 from nengo_learn_assoc_mem.learning_rules.fake_voja import FakeVoja
 
-import ipdb
 
+class StaticMixed(FakeVoja):
 
-class MaxMixed(FakeVoja):
-
-    def __init__(self, encoders: np.ndarray, bias: float, post_tau=0.005, learning_rate=1e-3, radius=1.):
-        super().__init__(encoders, post_tau, learning_rate)
+    def __init__(self, encoders: np.ndarray, max_rates: np.ndarray, thresh: float, max_dist=0.2,
+                 post_tau=0.005, learning_rate=1e-3, radius=1., sample_every=0.1):
+        super().__init__(encoders, post_tau, learning_rate, sample_every)
         self.radius = radius
-        self.bias = bias
+        assert 0. < thresh < 1.
+        self.thresh = thresh
+        self.max_dist = max_dist
+        self.max_rates = max_rates
 
     def encode(self, t):
-        threshold = self.bias * np.max(self.acts)
-
         lr = self.enabled * self.learning_rate
-        delta = lr * (self.acts[:, None] - threshold) * (self.encoders - self.in_sig)
+
+        dist = (self.encoders - self.in_sig)
+        dist_mag = np.linalg.norm(dist, axis=1)
+        dist[dist_mag > self.max_dist] = 0.
+
+        firing_ratio = self.acts / self.max_rates
+
+        delta = lr * (firing_ratio[:, None] - self.thresh) * dist
+
         mod_enc = self.encoders + delta
         mag = np.linalg.norm(mod_enc, axis=1)
         self.encoders = self.radius / mag[:, None] * mod_enc
@@ -29,21 +37,25 @@ class MaxMixed(FakeVoja):
 
 class MeanMixed(FakeVoja):
 
-    def __init__(self, encoders: np.ndarray, bias=1., max_dist=0.2, post_tau=0.005, learning_rate=1e-3, radius=1.):
-        super().__init__(encoders, post_tau, learning_rate)
+    def __init__(self, encoders: np.ndarray, max_rates: np.ndarray, bias=1., max_dist=0.2,
+                 post_tau=0.005, learning_rate=1e-3, radius=1., sample_every=0.1):
+        super().__init__(encoders, post_tau, learning_rate, sample_every)
         self.radius = radius
         self.bias = bias
         self.max_dist = max_dist
+        self.max_rates = max_rates
 
     def encode(self, t):
-        threshold = self.bias * np.mean(self.acts)
+        firing_ratio = self.acts / self.max_rates
+
+        threshold = self.bias * np.mean(firing_ratio)
         lr = self.enabled * self.learning_rate
 
         dist = (self.encoders - self.in_sig)
         dist_mag = np.linalg.norm(dist, axis=1)
         dist[dist_mag > self.max_dist] = 0.
 
-        delta = lr * (self.acts[:, None] - threshold) * dist
+        delta = lr * (firing_ratio[:, None] - threshold) * dist
 
         mod_enc = self.encoders + delta
         mag = np.linalg.norm(mod_enc, axis=1)
