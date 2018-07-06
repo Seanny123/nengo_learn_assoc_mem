@@ -11,7 +11,7 @@ import nengolib
 
 from nengo_learn_assoc_mem.utils import make_alt_vocab, BasicVecFeed, gen_added_strings, list_as_ascii
 from nengo_learn_assoc_mem.paths import data_path
-from nengo_learn_assoc_mem.learning_rules.mixed_voja import MeanMixed
+from nengo_learn_assoc_mem.learning_rules.mixed_voja import StaticMixed
 
 
 def get_encoders(cepts: np.ndarray, seed: float) -> np.ndarray:
@@ -25,7 +25,7 @@ def get_encoders(cepts: np.ndarray, seed: float) -> np.ndarray:
 
 
 def train_encoders(feed_vecs: np.ndarray, enc: np.ndarray, cepts: np.ndarray,
-                   nvoja_lr: float, learn_bias: float, max_diff: float, seed: float) -> np.ndarray:
+                   nvoja_lr: float, thresh: float, max_diff: float, seed: float) -> np.ndarray:
     feed = BasicVecFeed(feed_vecs, feed_vecs,
                         t_present, dimensions, len(feed_vecs), t_pause)
 
@@ -33,7 +33,7 @@ def train_encoders(feed_vecs: np.ndarray, enc: np.ndarray, cepts: np.ndarray,
         in_nd = nengo.Node(feed.feed)
         paused = nengo.Node(lambda t: 1 - feed.paused)
 
-        neg_voja = MeanMixed(enc.copy(), learn_bias, learning_rate=nvoja_lr, max_dist=max_diff)
+        neg_voja = StaticMixed(enc.copy(), thresh=thresh, learning_rate=nvoja_lr, max_dist=max_diff)
         ens = nengo.Ensemble(n_neurons, dimensions, intercepts=cepts, seed=seed)
 
         nengo.Connection(in_nd, neg_voja.input_signal, synapse=None)
@@ -148,8 +148,8 @@ foil2_slc = slice(foil1_slc.stop, foil1_slc.stop+td_each*n_items)
 init_seed = 8
 intercept = 0.2
 intercepts = np.ones(n_neurons) * intercept
-neg_voja_lr = -2e-6
-mixed_bias = 7.
+neg_voja_lr = -1e-6
+mixed_bias = 500.
 max_dist = 1.5
 past_encs = np.zeros((n_neurons, dimensions))
 start_encs = get_encoders(intercepts, init_seed)
@@ -174,4 +174,4 @@ for seed_val in range(10):
     test_response(fan1_pair_vecs + fan2_pair_vecs + foil1_pair_vecs + foil2_pair_vecs,
                   vocab,
                   learned_encs[-1].copy(),
-                  f"mixed_voja_with_dist_more_bias_{seed_val}.h5", learning_args, init_seed, False)
+                  f"static_voja_with_dist_{seed_val}.h5", learning_args, init_seed, False)

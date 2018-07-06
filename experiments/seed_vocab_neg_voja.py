@@ -11,7 +11,7 @@ import nengolib
 
 from nengo_learn_assoc_mem.utils import make_alt_vocab, BasicVecFeed, gen_added_strings, list_as_ascii
 from nengo_learn_assoc_mem.paths import data_path
-from nengo_learn_assoc_mem.learning_rules.mixed_voja import MeanMixed
+from nengo_learn_assoc_mem.learning_rules.neg_voja import NegVoja
 
 
 def get_encoders(cepts: np.ndarray, seed: float) -> np.ndarray:
@@ -25,7 +25,7 @@ def get_encoders(cepts: np.ndarray, seed: float) -> np.ndarray:
 
 
 def train_encoders(feed_vecs: np.ndarray, enc: np.ndarray, cepts: np.ndarray,
-                   nvoja_lr: float, learn_bias: float, max_diff: float, seed: float) -> np.ndarray:
+                   nvoja_lr: float, seed: float) -> np.ndarray:
     feed = BasicVecFeed(feed_vecs, feed_vecs,
                         t_present, dimensions, len(feed_vecs), t_pause)
 
@@ -33,7 +33,7 @@ def train_encoders(feed_vecs: np.ndarray, enc: np.ndarray, cepts: np.ndarray,
         in_nd = nengo.Node(feed.feed)
         paused = nengo.Node(lambda t: 1 - feed.paused)
 
-        neg_voja = MeanMixed(enc.copy(), learn_bias, learning_rate=nvoja_lr, max_dist=max_diff)
+        neg_voja = NegVoja(enc.copy(), learning_rate=nvoja_lr)
         ens = nengo.Ensemble(n_neurons, dimensions, intercepts=cepts, seed=seed)
 
         nengo.Connection(in_nd, neg_voja.input_signal, synapse=None)
@@ -94,7 +94,7 @@ def test_response(feed_vecs, vo, encs: np.ndarray, save_file: str, enc_args: Dic
         plt.show()
 
     # save the resulting activities, weights and vocab
-    save_path = os.path.join(data_path, "mixed_mean", save_file)
+    save_path = os.path.join(data_path, "", save_file)
     with h5py.File(save_path, "w") as fi:
         fi.create_dataset("resp/fan1", data=fan1_resp)
         fi.create_dataset("resp/fan2", data=fan2_resp)
@@ -146,11 +146,9 @@ foil1_slc = slice(fan2_slc.stop, fan2_slc.stop+td_each*n_items)
 foil2_slc = slice(foil1_slc.stop, foil1_slc.stop+td_each*n_items)
 
 init_seed = 8
-intercept = 0.2
-intercepts = np.ones(n_neurons) * intercept
-neg_voja_lr = -2e-6
-mixed_bias = 7.
-max_dist = 1.5
+intercept = 0.15
+intercepts = nengo.dists.Uniform(0., intercept).sample(n_neurons)
+neg_voja_lr = 5e-6
 past_encs = np.zeros((n_neurons, dimensions))
 start_encs = get_encoders(intercepts, init_seed)
 
@@ -161,17 +159,15 @@ for seed_val in range(10):
 
     learned_encs = train_encoders(fan1_pair_vecs + fan2_pair_vecs,
                                   start_encs, intercepts,
-                                  neg_voja_lr, mixed_bias, max_dist, init_seed)
+                                  neg_voja_lr, init_seed)
 
     assert not np.allclose(start_encs, learned_encs)
     assert not np.allclose(learned_encs, past_encs)
     past_encs = learned_encs.copy()
 
     learning_args = {"intercept": intercepts,
-                     "learning_rate": neg_voja_lr,
-                     "bias": mixed_bias,
-                     "max_dist": max_dist}
+                     "learning_rate": neg_voja_lr}
     test_response(fan1_pair_vecs + fan2_pair_vecs + foil1_pair_vecs + foil2_pair_vecs,
                   vocab,
                   learned_encs[-1].copy(),
-                  f"mixed_voja_with_dist_more_bias_{seed_val}.h5", learning_args, init_seed, False)
+                  f"neg_voja_{seed_val}.h5", learning_args, init_seed, False)
