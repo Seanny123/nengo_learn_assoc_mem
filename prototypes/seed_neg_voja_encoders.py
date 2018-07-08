@@ -1,6 +1,5 @@
 """Show that encoders"""
 from collections import namedtuple
-import itertools
 import os
 from typing import Dict
 
@@ -159,7 +158,7 @@ for seed_val in range(10):
 
     start_encs = get_encoders(intercepts, seed_val)
     learned_encs = train_encoders(start_encs, intercepts, neg_voja_lr, t_sim, seed_val)
-    
+
     assert not np.allclose(start_encs, learned_encs)
     assert not np.allclose(learned_encs, past_encs)
     past_encs = learned_encs.copy()
