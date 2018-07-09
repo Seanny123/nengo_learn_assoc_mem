@@ -15,13 +15,14 @@ class StaticMixed(FakeVoja):
         self.max_rates = max_rates
 
     def encode(self, t):
+        firing_ratio = self.acts / self.max_rates
+        assert np.all(firing_ratio <= 1.1)
+
         lr = self.enabled * self.learning_rate
 
         dist = (self.encoders - self.in_sig)
         dist_mag = np.linalg.norm(dist, axis=1)
         dist[dist_mag > self.max_dist] = 0.
-
-        firing_ratio = self.acts / self.max_rates
 
         delta = lr * (firing_ratio[:, None] - self.thresh) * dist
 
@@ -47,6 +48,7 @@ class MeanMixed(FakeVoja):
 
     def encode(self, t):
         firing_ratio = self.acts / self.max_rates
+        assert np.all(firing_ratio <= 1.1)
 
         threshold = self.bias * np.mean(firing_ratio)
         lr = self.enabled * self.learning_rate
