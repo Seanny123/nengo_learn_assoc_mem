@@ -16,7 +16,8 @@ from nengo_learn_assoc_mem.learning_rules.neg_voja import NegVoja
 
 def get_encoders(cepts: np.ndarray, seed: float) -> np.ndarray:
     with nengolib.Network(seed=seed) as model:
-        ens = nengo.Ensemble(n_neurons, dimensions, intercepts=cepts, seed=seed)
+        ens = nengo.Ensemble(n_neurons, dimensions,
+                             intercepts=cepts, seed=seed)
 
     with nengo.Simulator(model) as sim:
         pass
@@ -108,9 +109,8 @@ def test_response(feed_vecs, vo, encs: np.ndarray, save_file: str, enc_args: Dic
 
         enc = fi.create_dataset("encoders", data=encs)
         enc.attrs["seed"] = seed
-        enc.attrs["intercept"] = enc_args["intercept"]
-        enc.attrs["learning_rate"] = enc_args["learning_rate"]
-        enc.attrs["bias"] = enc_args["bias"]
+        for key, val in enc_args.items():
+            enc.attrs[key] = val
 
         pnt_nms = []
         pnt_vectors = []
