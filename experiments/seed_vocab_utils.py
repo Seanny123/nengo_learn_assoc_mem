@@ -1,4 +1,3 @@
-from typing import NamedTuple
 from typing import Tuple, Dict
 
 import h5py
@@ -10,22 +9,28 @@ from matplotlib import pyplot as plt
 from nengo_learn_assoc_mem.utils import BasicVecFeed, list_as_ascii, gen_added_strings
 
 
-class Constants(NamedTuple):
-    n_neurons: int
-    dimensions: int
-    n_items: int
+class Constants(object):
 
-    t_pause: float
-    t_present: float
-    dt: float = 0.001
-    t_each = t_pause + t_present
-    td_each = int(t_each / dt)
-    td_pause = int(t_pause / dt)
+    def __init__(self, n_neurons: int, dimensions: int, n_items: int, t_pause: float, t_present: float, dt=0.001):
+        super().__init__()
+        self.n_neurons = n_neurons
+        self.dimensions = dimensions
+        self.n_items = n_items
 
-    fan1_slc = slice(td_pause, td_each * n_items + td_pause)
-    fan2_slc = slice(fan1_slc.stop, fan1_slc.stop + td_each * n_items)
-    foil1_slc = slice(fan2_slc.stop, fan2_slc.stop + td_each * n_items)
-    foil2_slc = slice(foil1_slc.stop, foil1_slc.stop + td_each * n_items)
+        self.t_pause = t_pause
+        self.t_present = t_present
+        self.t_each = t_pause + t_present
+        self.td_each = int(self.t_each / dt)
+        self.td_pause = int(self.t_pause / dt)
+
+        self.fan1_slc = slice(self.td_pause,
+                              self.td_each * n_items + self.td_pause)
+        self.fan2_slc = slice(self.fan1_slc.stop,
+                              self.fan1_slc.stop + self.td_each * n_items)
+        self.foil1_slc = slice(self.fan2_slc.stop,
+                               self.fan2_slc.stop + self.td_each * n_items)
+        self.foil2_slc = slice(self.foil1_slc.stop,
+                               self.foil1_slc.stop + self.td_each * n_items)
 
 
 def get_ens_params(cnst: Constants, cepts: np.ndarray, seed: float) -> Tuple[np.ndarray, np.ndarray]:
