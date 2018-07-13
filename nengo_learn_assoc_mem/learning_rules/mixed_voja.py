@@ -9,18 +9,16 @@ class StaticMixed(FakeVoja):
                  post_tau=0.005, learning_rate=1e-3, radius=1., sample_every=0.1):
         super().__init__(encoders, post_tau, learning_rate, sample_every)
         self.radius = radius
-        assert 0. < thresh < 1.
         self.thresh = thresh
         self.max_dist = max_dist
         self.max_rates = max_rates
 
     def encode(self, t):
         firing_ratio = self.acts / self.max_rates
-        assert np.all(firing_ratio <= 1.1)
 
         lr = self.enabled * self.learning_rate
 
-        dist = (self.encoders - self.in_sig)
+        dist = self.encoders - self.in_sig
         dist_mag = np.linalg.norm(dist, axis=1)
         dist[dist_mag > self.max_dist] = 0.
 
@@ -48,12 +46,11 @@ class MeanMixed(FakeVoja):
 
     def encode(self, t):
         firing_ratio = self.acts / self.max_rates
-        assert np.all(firing_ratio <= 1.1)
 
         threshold = self.bias * np.mean(firing_ratio)
         lr = self.enabled * self.learning_rate
 
-        dist = (self.encoders - self.in_sig)
+        dist = self.encoders - self.in_sig
         dist_mag = np.linalg.norm(dist, axis=1)
         dist[dist_mag > self.max_dist] = 0.
 
