@@ -95,7 +95,7 @@ def test_response(feed_vecs, vo, encs: np.ndarray, save_file: str, enc_args: Dic
         plt.show()
 
     # save the resulting activities, weights and vocab
-    save_path = os.path.join(data_path, "", save_file)
+    save_path = os.path.join(data_path, "neg_voja", save_file)
     with h5py.File(save_path, "w") as fi:
         fi.create_dataset("resp/fan1", data=fan1_resp)
         fi.create_dataset("resp/fan2", data=fan2_resp)
