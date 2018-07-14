@@ -129,7 +129,7 @@ def test_response(feed_vecs, vo, encs: np.ndarray, save_file: str, enc_args: Dic
 
 n_items = 16
 dimensions = 32
-n_neurons = 2000
+n_neurons = 500
 
 dt = 0.001
 
@@ -146,8 +146,9 @@ foil1_slc = slice(fan2_slc.stop, fan2_slc.stop+td_each*n_items)
 foil2_slc = slice(foil1_slc.stop, foil1_slc.stop+td_each*n_items)
 
 init_seed = 8
+rng = np.random.RandomState(init_seed)
 intercept = 0.15
-intercepts = nengo.dists.Uniform(0., intercept).sample(n_neurons)
+intercepts = nengo.dists.Uniform(0., intercept).sample(n_neurons, rng=rng)
 neg_voja_lr = 5e-6
 past_encs = np.zeros((n_neurons, dimensions))
 start_encs = get_encoders(intercepts, init_seed)
@@ -170,4 +171,4 @@ for seed_val in range(10):
     test_response(fan1_pair_vecs + fan2_pair_vecs + foil1_pair_vecs + foil2_pair_vecs,
                   vocab,
                   learned_encs[-1].copy(),
-                  f"neg_voja_{seed_val}.h5", learning_args, init_seed, False)
+                  f"neg_voja_alt_{seed_val}.h5", learning_args, init_seed, False)

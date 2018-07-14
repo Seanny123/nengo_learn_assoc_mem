@@ -10,7 +10,7 @@ from nengo_learn_assoc_mem.learning_rules.mixed_voja import StaticMixed
 
 n_items = 16
 dimensions = 32
-n_neurons = 2000
+n_neurons = 500
 
 dt = 0.001
 
@@ -48,7 +48,7 @@ for seed_val in range(10):
     assert not np.allclose(learned_encs, past_encs)
     past_encs = learned_encs.copy()
 
-    save_path = os.path.join(base_path, f"static_voja_{seed_val}.h5")
+    save_path = os.path.join(base_path, f"static_voja_alt_{seed_val}.h5")
     test_response(consts, fan1_pair_vecs + fan2_pair_vecs + foil1_pair_vecs + foil2_pair_vecs,
                   vocab, vocab_strs,
                   learned_encs[-1].copy(), intercepts, max_rates,
