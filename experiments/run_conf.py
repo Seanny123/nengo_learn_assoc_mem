@@ -6,8 +6,6 @@ import h5py
 import numpy as np
 import nengo_spa as spa
 import nengo
-import matplotlib.pyplot as plt
-import ipdb
 
 from nengo_learn_assoc_mem.utils import numpy_bytes_to_str, norm_spa_vecs, BasicVecFeed
 from nengo_learn_assoc_mem.paths import data_path
@@ -49,10 +47,7 @@ def train_decoders(in_vecs: List[np.ndarray],  n_nrns: int, dims: int,
         nengo.Connection(learning, pes_learn_control[-1],
                          synapse=None)
 
-        p_in = nengo.Probe(in_nd)
-        p_cor = nengo.Probe(correct, synapse=None)
         p_dec = nengo.Probe(conn_out, 'weights', sample_every=0.1)
-        p_out = nengo.Probe(output, synapse=0.01)
 
     with nengo.Simulator(learned_model) as learned_sim:
         learned_sim.run(len(in_vecs) * t_each + t_paus)
@@ -60,9 +55,9 @@ def train_decoders(in_vecs: List[np.ndarray],  n_nrns: int, dims: int,
     return learned_sim.data[p_dec][-1]
 
 
-def run_comp(in_vec: np.ndarray, n_nrns: int, dims: int,
+def run_comp(in_vec: np.ndarray, dec: np.ndarray, n_nrns: int, dims: int,
              enc: np.ndarray, cepts: np.ndarray, seed: int,
-             t_sim: float, thresh=.7) -> np.ndarray:
+             t_sim: float) -> np.ndarray:
 
     with spa.Network(seed=seed) as model:
         in_nd = nengo.Node(lambda t: in_vec)
@@ -72,47 +67,38 @@ def run_comp(in_vec: np.ndarray, n_nrns: int, dims: int,
                              encoders=enc,
                              intercepts=cepts, seed=seed)
         cmp = spa.Compare(dims)
-        cmp_res = nengo.Ensemble(200, 1)
-
-        integ_tau = 0.1
-        integ_nrns = 100
-        pos_integ = nengo.networks.Integrator(integ_tau, integ_nrns, 1)
-        neg_integ = nengo.networks.Integrator(integ_tau, integ_nrns, 1)
 
         nengo.Connection(in_nd, ens, synapse=None)
-        nengo.Connection(ens, cmp.input_a, synapse=.01)
+        nengo.Connection(ens.neurons, cmp.input_a, synapse=.01, transform=dec)
         nengo.Connection(in_nd, cmp.input_b, synapse=.01)
-        nengo.Connection(cmp.output, cmp_res)
-        nengo.Connection(cmp_res, pos_integ.input,
-                         function=lambda x: x - thresh)
-        nengo.Connection(cmp_res, neg_integ.input,
-                         function=lambda x: -x + thresh)
 
         p_cmp_out = nengo.Probe(cmp.output, synapse=.01)
 
     with nengo.Simulator(model, progress_bar=False) as sim:
         sim.run(t_sim)
 
-    return sim.data[p_cmp_out]
+    cmp_out = sim.data[p_cmp_out]
+    print(f"Final cmp val: {cmp_out[-1]}")
+    return cmp_out
 
 
-def run_integ(cmp_out: List, seed: float, thresh=.7, dt=0.001) -> Dict[str, np.ndarray]:
+def run_integ(cmp_out: List, seed: float, dt=0.001, pos_adjust=0.3) -> Dict[str, np.ndarray]:
     t_sim = len(cmp_out) * dt
 
     with spa.Network(seed=seed) as model:
         in_nd = nengo.Node(lambda t: cmp_out[int((t-dt)/dt)])
-        cmp_res = nengo.Ensemble(200, 1)
+        cmp_res = nengo.Ensemble(300, 1)
 
         integ_tau = 0.1
-        integ_nrns = 100
+        integ_nrns = 300
         pos_integ = nengo.networks.Integrator(integ_tau, integ_nrns, 1)
         neg_integ = nengo.networks.Integrator(integ_tau, integ_nrns, 1)
 
-        nengo.Connection(in_nd, cmp_res)
+        nengo.Connection(in_nd, cmp_res, synapse=None)
         nengo.Connection(cmp_res, pos_integ.input,
-                         function=lambda x: x - thresh)
+                         function=lambda x: x - pos_adjust)
         nengo.Connection(cmp_res, neg_integ.input,
-                         function=lambda x: -x + thresh)
+                         function=lambda x: 1 - x)
 
         p_pos_out = nengo.Probe(pos_integ.output, synapse=.05)
         p_neg_out = nengo.Probe(neg_integ.output, synapse=.05)
@@ -173,36 +159,32 @@ for seed_val in range(10):
     all_comp_res = []
     final_vals = []
     for f_i, f_vec in enumerate(feed_vecs):
-        comp_res = run_comp(f_vec, n_neurons, dimensions,
+        comp_res = run_comp(f_vec, decs, n_neurons, dimensions,
                             encoders, intercepts, init_seed, 0.2)
         final_vals.append(comp_res[-1])
         all_comp_res.append(comp_res)
 
     train_len = len(train_vecs)
+    max_targ_comp = np.max(final_vals[:train_len])
     min_targ_comp = np.min(final_vals[:train_len])
     max_foil_comp = np.max(final_vals[train_len:])
-    class_thresh = (min_targ_comp - max_foil_comp) / 2
+    min_foil_comp = np.min(final_vals[train_len:])
 
-    if class_thresh < 0:
-        print("ERRORS INCOMING")
-        class_thresh = np.abs(class_thresh)
-    # with h5py.File(save_path, "w") as w_fi:
-    #     w_fi.create_dataset(f"comp_res_{seed_val}", data=all_comp_res)
+    with h5py.File(save_path, "w") as w_fi:
+        w_fi.create_dataset(f"comp_res_{seed_val}", data=all_comp_res)
 
     neg_integ_res = []
     pos_integ_res = []
     print("simulating integration")
     for c_i, c_res in enumerate(all_comp_res):
-        print(f"Comp {c_i}")
-        integ_res = run_integ(list(c_res), init_seed, thresh=class_thresh)
+        integ_res = run_integ(list(c_res)[10:125], init_seed, pos_adjust=min_foil_comp - .05)
         neg_integ_res.append(integ_res["neg"])
         pos_integ_res.append(integ_res["pos"])
 
-    ipdb.set_trace()
     print(f"Done seed {seed_val}")
     # save output confidence for each input vector
-    # with h5py.File(save_path, "a") as w_fi:
-    #     w_fi.create_dataset(f"integ_res_pos_{seed_val}",
-    #                         data=pos_integ_res)
-    #     w_fi.create_dataset(f"integ_res_neg_{seed_val}",
-    #                         data=neg_integ_res)
+    with h5py.File(save_path, "a") as w_fi:
+        w_fi.create_dataset(f"integ_res_pos_{seed_val}",
+                            data=pos_integ_res)
+        w_fi.create_dataset(f"integ_res_neg_{seed_val}",
+                            data=neg_integ_res)
