@@ -170,7 +170,7 @@ for seed_val in range(10):
     max_foil_comp = np.max(final_vals[train_len:])
     min_foil_comp = np.min(final_vals[train_len:])
 
-    with h5py.File(save_path, "w") as w_fi:
+    with h5py.File(save_path, "a") as w_fi:
         w_fi.create_dataset(f"comp_res_{seed_val}", data=all_comp_res)
 
     neg_integ_res = []
